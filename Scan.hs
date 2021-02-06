@@ -57,7 +57,7 @@ data Token = OpenParen
            deriving (Show)
 
 data Scanner = Scanner {
-        source :: String,
+        sourceLeft :: String,
         currentChar :: Int,
         currentLine :: Int,
         currentColumn :: Int
@@ -66,7 +66,7 @@ data Scanner = Scanner {
 
 scan :: String -> [Located (Either String Token)]
 scan source = scan' Scanner {
-        source = source,
+        sourceLeft = source,
         currentChar = 0,
         currentLine = 1,
         currentColumn = 1
@@ -101,33 +101,33 @@ scan' scanner
 
     | currChar == '/' =
         if nextChar == '/' then
-            let toNl = findIndex (=='\n') $ sourceLeft
+            let toNl = findIndex (=='\n') $ sourceLeft scanner
                 commentLength = case toNl of
                     Just amtToNl -> amtToNl
-                    Nothing      -> amtSourceLeft
+                    Nothing      -> length $ sourceLeft scanner
             in scan' $ advanceScanner scanner commentLength
         else tokenAndAdvance scanner 1 $ Right Slash
 
     | currChar == '"' =
-        let afterOpenQuote = drop 1 sourceLeft
+        let afterOpenQuote = drop 1 $ sourceLeft scanner
             closingQuote = findIndex (=='"') afterOpenQuote
         in case closingQuote of
                 Just amtToQuote -> tokenAndAdvance scanner (amtToQuote + 2) $ Right $ StringLiteral $ take amtToQuote afterOpenQuote
-                Nothing         -> tokenAndAdvance scanner amtSourceLeft $ Left "unterminated string literal"
+                Nothing         -> tokenAndAdvance scanner (length $ sourceLeft scanner) $ Left "unterminated string literal"
 
     | isDigit currChar =
-        let digits = takeWhile isDigit sourceLeft
+        let digits = takeWhile isDigit $ sourceLeft scanner
             amtIntDigits = length digits
-            hasFloat = sourceLeft !! amtIntDigits == '.' && (isDigit $ sourceLeft !! (amtIntDigits + 1))
+            hasFloat = sourceLeft scanner !! amtIntDigits == '.' && (isDigit $ sourceLeft scanner !! (amtIntDigits + 1))
             allDigits = if hasFloat
                 then
-                    let floatingComponent = takeWhile isDigit $ drop (amtIntDigits + 1) sourceLeft
+                    let floatingComponent = takeWhile isDigit $ drop (amtIntDigits + 1) $ sourceLeft scanner
                     in digits ++ "." ++ floatingComponent
                 else digits
         in tokenAndAdvance scanner (length allDigits) $ Right $ NumberLiteral $ read allDigits
 
     | isAlpha currChar =
-        let iden = takeWhile (\ch -> isAlpha ch || ch == '_') sourceLeft
+        let iden = takeWhile (\ch -> isAlpha ch || ch == '_') $ sourceLeft scanner
             numChars = length iden
             value = case iden of
                 "and" -> And
@@ -154,19 +154,13 @@ scan' scanner
     | otherwise             = tokenAndAdvance scanner 1 $ Left "bad character"
 
     where
-        sourceLeft = drop (currentChar scanner) $ source scanner
-        amtSourceLeft = length sourceLeft
-        currChar = sourceLeft !! 0
-        nextChar = sourceLeft !! 1
+        currChar = sourceLeft scanner !! 0
+        nextChar = sourceLeft scanner !! 1
         matchedEq = nextChar == '='
 
 atEnd :: Scanner -> Bool
-atEnd scanner = currentChar scanner == scannerSourceLength
-    where
-        scannerSourceLength = length (source scanner)
-
-charAt :: Scanner -> Int -> Char
-charAt scanner n = source scanner !! n
+atEnd (Scanner { sourceLeft = [] }) = True
+atEnd _ = False
 
 makeToken :: Scanner -> Int -> a -> Located a
 makeToken scanner length value = Located {
@@ -183,13 +177,13 @@ tokenAndAdvance scanner length value = (makeToken scanner length value) : (scan'
 advanceScanner :: Scanner -> Int -> Scanner
 advanceScanner scanner 0 = scanner
 advanceScanner scanner 1 = Scanner {
-        source = source scanner,
+        sourceLeft = drop 1 $ sourceLeft scanner,
         currentChar = currentChar scanner + 1,
         currentLine = nextLine,
         currentColumn = nextColumn
     }
     where
-        pastNl = charAt scanner (currentChar scanner) == '\n'
+        pastNl = sourceLeft scanner !! 0 == '\n'
         nextLine = currentLine scanner + (if pastNl then 1 else 0)
         nextColumn = if pastNl then 1 else currentColumn scanner + 1
 advanceScanner scanner n = advanceScanner advanced1Less 1
