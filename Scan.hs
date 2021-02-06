@@ -1,4 +1,4 @@
-module Scan (Token, scan) where
+module Scan (Token(..), scan) where
 
 import Data.List
 import Data.Char(isDigit, isAlpha)
@@ -129,7 +129,7 @@ scan' scanner
     | isAlpha currChar =
         let iden = takeWhile (\ch -> isAlpha ch || ch == '_') $ sourceLeft scanner
             numChars = length iden
-            value = case iden of
+            tokenValue = case iden of
                 "and" -> And
                 "class" -> Class
                 "else" -> Else
@@ -147,7 +147,7 @@ scan' scanner
                 "var" -> Var
                 "while" -> While
                 _ -> Identifier iden
-        in tokenAndAdvance scanner numChars $ Right value
+        in tokenAndAdvance scanner numChars $ Right tokenValue
 
     | currChar == ' ' || currChar == '\r' || currChar == '\t' || currChar == '\n' = scan' $ advanceScanner scanner 1
 
@@ -163,16 +163,16 @@ atEnd (Scanner { sourceLeft = [] }) = True
 atEnd _ = False
 
 makeToken :: Scanner -> Int -> a -> Located a
-makeToken scanner length value = Located {
-        value = value,
+makeToken scanner tokenLength tokenValue = Located {
+        value = tokenValue,
         start = currentChar scanner,
-        end = currentChar scanner + length,
+        end = currentChar scanner + tokenLength,
         line = currentLine scanner,
         col = currentColumn scanner
     }
 
 tokenAndAdvance :: Scanner -> Int -> Either String Token -> [Located (Either String Token)]
-tokenAndAdvance scanner length value = (makeToken scanner length value) : (scan' $ advanceScanner scanner length)
+tokenAndAdvance scanner tokenLength tokenValue = (makeToken scanner tokenLength tokenValue) : (scan' $ advanceScanner scanner tokenLength)
 
 advanceScanner :: Scanner -> Int -> Scanner
 advanceScanner scanner 0 = scanner
