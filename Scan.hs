@@ -64,7 +64,10 @@ data Scanner = Scanner {
     }
     deriving (Show)
 
-scan :: String -> [Located (Either String Token)]
+data ScanError = ScanError (Located String)
+    deriving (Show)
+
+scan :: String -> ([Located Token], [ScanError])
 scan source = scan' Scanner {
         sourceLeft = source,
         currentChar = 0,
@@ -72,32 +75,32 @@ scan source = scan' Scanner {
         currentColumn = 1
     }
 
-scan' :: Scanner -> [Located (Either String Token)]
+scan' :: Scanner -> ([Located Token], [ScanError])
 scan' scanner
-    | atEnd scanner   = [makeToken scanner 0 $ Right Eof]
-    | currChar == '(' = tokenAndAdvance scanner 1 $ Right OpenParen
-    | currChar == ')' = tokenAndAdvance scanner 1 $ Right CloseParen
-    | currChar == '{' = tokenAndAdvance scanner 1 $ Right OpenBrace
-    | currChar == '}' = tokenAndAdvance scanner 1 $ Right CloseBrace
-    | currChar == '.' = tokenAndAdvance scanner 1 $ Right Dot
-    | currChar == ',' = tokenAndAdvance scanner 1 $ Right Comma
-    | currChar == '-' = tokenAndAdvance scanner 1 $ Right Minus
-    | currChar == '+' = tokenAndAdvance scanner 1 $ Right Plus
-    | currChar == ';' = tokenAndAdvance scanner 1 $ Right Semicolon
-    | currChar == '*' = tokenAndAdvance scanner 1 $ Right Star
+    | atEnd scanner   = ([scannerToLocated scanner 0 $ Eof], [])
+    | currChar == '(' = tokenAndAdvance scanner 1 $ OpenParen
+    | currChar == ')' = tokenAndAdvance scanner 1 $ CloseParen
+    | currChar == '{' = tokenAndAdvance scanner 1 $ OpenBrace
+    | currChar == '}' = tokenAndAdvance scanner 1 $ CloseBrace
+    | currChar == '.' = tokenAndAdvance scanner 1 $ Dot
+    | currChar == ',' = tokenAndAdvance scanner 1 $ Comma
+    | currChar == '-' = tokenAndAdvance scanner 1 $ Minus
+    | currChar == '+' = tokenAndAdvance scanner 1 $ Plus
+    | currChar == ';' = tokenAndAdvance scanner 1 $ Semicolon
+    | currChar == '*' = tokenAndAdvance scanner 1 $ Star
 
     | currChar == '!' =
         let (tokenLength, tokenType) = if matchedEq then (2, BangEqual) else (1, Bang)
-        in tokenAndAdvance scanner tokenLength $ Right tokenType
+        in tokenAndAdvance scanner tokenLength tokenType
     | currChar == '=' =
         let (tokenLength, tokenType) = if matchedEq then (2, EqualEqual) else (1, Equal)
-        in tokenAndAdvance scanner tokenLength $ Right tokenType
+        in tokenAndAdvance scanner tokenLength tokenType
     | currChar == '<' =
         let (tokenLength, tokenType) = if matchedEq then (2, LessEqual) else (1, Less)
-        in tokenAndAdvance scanner tokenLength $ Right tokenType
+        in tokenAndAdvance scanner tokenLength tokenType
     | currChar == '>' =
         let (tokenLength, tokenType) = if matchedEq then (2, GreaterEqual) else (1, Greater)
-        in tokenAndAdvance scanner tokenLength $ Right tokenType
+        in tokenAndAdvance scanner tokenLength tokenType
 
     | currChar == '/' =
         if nextChar == '/' then
@@ -106,14 +109,14 @@ scan' scanner
                     Just amtToNl -> amtToNl
                     Nothing      -> length $ sourceLeft scanner
             in scan' $ advanceScanner scanner commentLength
-        else tokenAndAdvance scanner 1 $ Right Slash
+        else tokenAndAdvance scanner 1 Slash
 
     | currChar == '"' =
         let afterOpenQuote = drop 1 $ sourceLeft scanner
             closingQuote = findIndex (=='"') afterOpenQuote
         in case closingQuote of
-                Just amtToQuote -> tokenAndAdvance scanner (amtToQuote + 2) $ Right $ StringLiteral $ take amtToQuote afterOpenQuote
-                Nothing         -> tokenAndAdvance scanner (length $ sourceLeft scanner) $ Left "unterminated string literal"
+                Just amtToQuote -> tokenAndAdvance scanner (amtToQuote + 2) $ StringLiteral $ take amtToQuote afterOpenQuote
+                Nothing         -> errorAndAdvance scanner (length $ sourceLeft scanner) $ "unterminated string literal"
 
     | isDigit currChar =
         let digits = takeWhile isDigit $ sourceLeft scanner
@@ -124,7 +127,7 @@ scan' scanner
                     let floatingComponent = takeWhile isDigit $ drop (amtIntDigits + 1) $ sourceLeft scanner
                     in digits ++ "." ++ floatingComponent
                 else digits
-        in tokenAndAdvance scanner (length allDigits) $ Right $ NumberLiteral $ read allDigits
+        in tokenAndAdvance scanner (length allDigits) $ NumberLiteral $ read allDigits
 
     | isAlpha currChar =
         let iden = takeWhile (\ch -> isAlpha ch || ch == '_') $ sourceLeft scanner
@@ -147,11 +150,11 @@ scan' scanner
                 "var" -> Var
                 "while" -> While
                 _ -> Identifier iden
-        in tokenAndAdvance scanner numChars $ Right tokenValue
+        in tokenAndAdvance scanner numChars tokenValue
 
     | currChar == ' ' || currChar == '\r' || currChar == '\t' || currChar == '\n' = scan' $ advanceScanner scanner 1
 
-    | otherwise             = tokenAndAdvance scanner 1 $ Left "bad character"
+    | otherwise             = errorAndAdvance scanner 1 "bad character"
 
     where
         currChar = sourceLeft scanner !! 0
@@ -162,17 +165,26 @@ atEnd :: Scanner -> Bool
 atEnd (Scanner { sourceLeft = [] }) = True
 atEnd _ = False
 
-makeToken :: Scanner -> Int -> a -> Located a
-makeToken scanner tokenLength tokenValue = Located {
-        value = tokenValue,
+scannerToLocated :: Scanner -> Int -> a -> Located a
+scannerToLocated scanner thingLength thing = Located {
+        value = thing,
         start = currentChar scanner,
-        end = currentChar scanner + tokenLength,
+        end = currentChar scanner + thingLength,
         line = currentLine scanner,
         col = currentColumn scanner
     }
 
-tokenAndAdvance :: Scanner -> Int -> Either String Token -> [Located (Either String Token)]
-tokenAndAdvance scanner tokenLength tokenValue = (makeToken scanner tokenLength tokenValue) : (scan' $ advanceScanner scanner tokenLength)
+tokenAndAdvance :: Scanner -> Int -> Token -> ([Located Token], [ScanError])
+tokenAndAdvance scanner tokenLength tokenValue =
+    let currentToken = (scannerToLocated scanner tokenLength tokenValue)
+        (nextTokens, nextErrs) = scan' $ advanceScanner scanner tokenLength
+    in (currentToken:nextTokens, nextErrs)
+
+errorAndAdvance :: Scanner -> Int -> String -> ([Located Token], [ScanError])
+errorAndAdvance scanner errLength err =
+    let currentErr = ScanError $ scannerToLocated scanner errLength err
+        (nextTokens, nextErrs) = scan' $ advanceScanner scanner errLength
+    in (nextTokens, currentErr:nextErrs)
 
 advanceScanner :: Scanner -> Int -> Scanner
 advanceScanner scanner 0 = scanner
@@ -186,6 +198,4 @@ advanceScanner scanner 1 = Scanner {
         pastNl = sourceLeft scanner !! 0 == '\n'
         nextLine = currentLine scanner + (if pastNl then 1 else 0)
         nextColumn = if pastNl then 1 else currentColumn scanner + 1
-advanceScanner scanner n = advanceScanner advanced1Less 1
-    where
-        advanced1Less = advanceScanner scanner (n - 1)
+advanceScanner scanner n = advanceScanner (advanceScanner scanner $ n - 1) 1

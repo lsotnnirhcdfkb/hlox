@@ -3,7 +3,6 @@ module Main where
 import System.Environment
 import Scan
 import Parse
-import Diagnostic
 
 main :: IO ()
 main = getArgs >>=
@@ -19,11 +18,10 @@ runFile :: String -> IO ()
 runFile fileName = readFile fileName >>= run
 
 run :: String -> IO ()
-run source = errorsReported >> (putStrLn $ show parsed)
+run source = reportErrors >> (putStrLn $ show parsed)
     where
-        scanned = scan source
-        scannedFiltered = [copyLocation token loc | loc@(Located { value = (Right token) }) <- scanned]
+        (scanned, errors) = scan source
+        reportErrors = mapM_ (putStrLn . show) errors
+        scanSuccess = length errors == 0
 
-        errorsReported = sequence [putStrLn err | Located { value = (Left err) } <- scanned]
-
-        parsed = parse scannedFiltered
+        parsed = parse scanned
