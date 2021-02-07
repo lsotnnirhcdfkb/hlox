@@ -43,7 +43,7 @@ peek (Parser { tokens = (firstToken:_) }) = firstToken
 peek (Parser { tokens = [] }) = error "peek empty parser"
 
 parseExpr :: Parser -> ParserOutput (Located Expr)
-parseExpr (Parser []) = error "parser should never be empty: there should be an eof token that terminates it"
+parseExpr (Parser []) = error "parser should never be empty! there should be an eof token that terminates it"
 parseExpr parser =
     let locatedFirstToken@(Located firstTokenSpan firstToken):_ = tokens parser
         newparser = parser `advance` 1
