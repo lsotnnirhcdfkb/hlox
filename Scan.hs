@@ -69,7 +69,9 @@ data ScanError = ScanError (Located String)
     deriving (Show)
 
 instance ToError ScanError where
-    toErr (ScanError (Located errSpan errMsg)) = Error (Just errSpan) errMsg []
+    toErr (ScanError (Located errSpan errMsg)) = Error
+        [ Message (Just errSpan) errMsg
+        ]
 
 scan :: String -> ([Located Token], [ScanError])
 scan source = scan' Scanner {

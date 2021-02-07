@@ -11,8 +11,13 @@ data ParseError = Expected Span String
     deriving (Show)
 
 instance ToError ParseError where
-    toErr (Expected span expect) = Error (Just span) ("expected " ++ expect) []
-    toErr (ExpectedCloseParen notCloseParenSpan toMatch) = Error (Just notCloseParenSpan) "expected closing parenthesis" [Message (Just toMatch) "to match this"]
+    toErr (Expected span expect) = Error
+        [ Message (Just span) $ "expected " ++ expect
+        ]
+    toErr (ExpectedCloseParen notCloseParenSpan toMatch) = Error
+        [ Message (Just notCloseParenSpan) "expected ')'"
+        , Message (Just toMatch) "to match this"
+        ]
 
 data Parser = Parser
     { tokens :: [Located Token]

@@ -16,7 +16,7 @@ class ToError e where
 data Located a = Located Span a
     deriving (Show)
 
-data Error = Error (Maybe Span) String [Message]
+data Error = Error [Message]
 data Message = Message (Maybe Span) String
 
 data Span = Span
@@ -30,19 +30,24 @@ data Span = Span
 joinSpan :: Span -> Span -> Span
 joinSpan a b = a { end = end b }
 
+nthLineOf :: String -> Int -> String
+nthLineOf src n
+    | linesIndex < length lns = lns !! linesIndex
+    | otherwise                            = ""
+    where
+        linesIndex = n - 1
+        lns = lines src
+
 report :: Error -> IO ()
-report (Error mainLocation mainMessage messages) =
+report (Error messages) =
     putStr finalMessage
     where
-        putLocation :: Maybe Span -> String
-        putLocation (Just (Span source start end line col)) =
-            let substr = (take $ end - start) . drop start $ source
-            in "[line " ++ show line ++ ", col " ++ show col ++ ", at '" ++ substr ++ "']"
-        putLocation Nothing = "somewhere"
-
         formatMessage :: Message -> String
-        formatMessage (Message location message) = " - " ++ putLocation location ++ ": " ++ message ++ "\n"
+        formatMessage (Message (Just (Span src _ _ msgLine msgCol)) message) =
+             lineNrText ++ nthLineOf src msgLine ++ "\n" ++
+             (' ' <$ lineNrText) ++ (' ' <$ [2..msgCol]) ++ "^ " ++ message ++ "\n"
+            where
+                lineNrText = show msgLine ++ " (:" ++ show msgCol ++ ") | "
+        formatMessage (Message Nothing message) = "<somewhere>: " ++ message ++ "\n"
 
-        heading = "Error at " ++ putLocation mainLocation ++ ": " ++ mainMessage ++ "\n"
-
-        finalMessage = heading ++ (foldl' (++) "" $ map formatMessage messages)
+        finalMessage = "error:\n" ++ (foldl' (++) "" $ map formatMessage messages)
