@@ -6,12 +6,16 @@ import Diagnostic
 
 -- note: this parser code is kind of janky
 
-data ParseError = Expected Span String
+data ParseError = ExpectedAfter Span String
+                | ExpectedAt Span String
                 | ExpectedCloseParen Span Span
     deriving (Show)
 
 instance ToError ParseError where
-    toErr (Expected span expect) = Error
+    toErr (ExpectedAt span expect) = Error
+        [ Message (Just $ At span) $ "expected " ++ expect
+        ]
+    toErr (ExpectedAfter span expect) = Error
         [ Message (Just $ After span) $ "expected " ++ expect
         ]
     toErr (ExpectedCloseParen needParenSpan toMatch) = Error
@@ -50,7 +54,7 @@ parseExpr parser =
         OpenParen       -> newparser `parseGroupingExpr` locatedFirstToken
         Minus           -> newparser `parseUnaryExpr` locatedFirstToken
         Bang            -> newparser `parseUnaryExpr` locatedFirstToken
-        _               -> (Nothing, [Expected firstTokenSpan "expression"], parser)
+        _               -> (Nothing, [ExpectedAt firstTokenSpan "expression"], parser)
 
 parseBoolExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
 parseBoolExpr parser (Located boolSpan boolToken) =
