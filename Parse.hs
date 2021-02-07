@@ -6,8 +6,7 @@ import Diagnostic
 
 -- note: this parser code is kind of janky
 
-data ParseError = UnexpectedEOF
-                | Expected Span String
+data ParseError = Expected Span String
                 | ExpectedCloseParen Span Span
     deriving (Show)
 
