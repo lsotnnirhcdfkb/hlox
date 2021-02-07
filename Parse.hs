@@ -12,11 +12,11 @@ data ParseError = Expected Span String
 
 instance ToError ParseError where
     toErr (Expected span expect) = Error
-        [ Message (Just span) $ "expected " ++ expect
+        [ Message (Just $ After span) $ "expected " ++ expect
         ]
-    toErr (ExpectedCloseParen notCloseParenSpan toMatch) = Error
-        [ Message (Just notCloseParenSpan) "expected ')'"
-        , Message (Just toMatch) "to match this"
+    toErr (ExpectedCloseParen needParenSpan toMatch) = Error
+        [ Message (Just $ After needParenSpan) "expected ')'"
+        , Message (Just $ At toMatch) "to match this"
         ]
 
 data Parser = Parser
@@ -73,10 +73,17 @@ parseStringExpr parser (Located stringSpan stringToken) =
 parseGroupingExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
 parseGroupingExpr parser (Located openParenSpan _) =
     let (maybeExpr, errs, parser') = parseExpr parser
-        (closeParenSpan, parser'', parenErrs) = case peek parser' of
-            Located closeParenSpan CloseParen -> (Just closeParenSpan, parser' `advance` 1, [])
-            Located notCloseParenSpan _ -> (Nothing, parser', [ExpectedCloseParen notCloseParenSpan openParenSpan])
-        groupedExpr = Located <$> ((openParenSpan `joinSpan`) <$> closeParenSpan) <*> (GroupingExpr <$> maybeExpr)
+        (groupedExpr, parenErrs, parser'') = case maybeExpr of
+            Just locatedInsideParenExpr@(Located insideParenSpan _) ->
+                let (maybeCloseParenSpan, parser'', parenErrs) = case peek parser' of
+                        Located closeParenSpan CloseParen -> (Just closeParenSpan, parser' `advance` 1, [])
+                        _ -> (Nothing, parser', [ExpectedCloseParen insideParenSpan openParenSpan])
+                    groupedExpr = (\closeParenSpan ->
+                        Located (openParenSpan `joinSpan` closeParenSpan) (GroupingExpr locatedInsideParenExpr)) <$> maybeCloseParenSpan
+                in (groupedExpr, parenErrs, parser'')
+
+            Nothing -> (Nothing, [], parser')
+
     in (groupedExpr, errs ++ parenErrs, parser'')
 
 parseUnaryExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
