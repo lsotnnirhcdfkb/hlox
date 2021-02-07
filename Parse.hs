@@ -4,57 +4,80 @@ import Scan
 import Ast
 import Diagnostic
 
+-- note: this parser code is kind of janky
+
 data ParseError = UnexpectedEOF
-                | ExpectedExpr
+                | Expected String
     deriving (Show)
 
+data Parser = Parser
+    { tokens :: [Located Token]
+    } deriving (Show)
+
 parse :: [Located Token] -> (Maybe (Located Expr), [ParseError])
-parse = parseExpr
+parse tokens = (outputAST, errors)
+    where
+        parser = Parser tokens
+        (outputAST, errors, _) = parseExpr parser
 
-parseExpr :: [Located Token] -> (Maybe (Located Expr), [ParseError])
-parseExpr [] = (Nothing, [UnexpectedEOF])
-parseExpr (locatedFirst:tokens) =
-    let Located _ firstToken = locatedFirst
+type ParserOutput a = (Maybe a, [ParseError], Parser)
+
+advance :: Parser -> Int -> Parser
+advance (Parser tokens) n = Parser $ drop n tokens
+
+peek :: Parser -> Located Token
+peek (Parser { tokens = (firstToken:_) }) = firstToken
+peek (Parser { tokens = [] }) = error "peek empty parser"
+
+parseExpr :: Parser -> ParserOutput (Located Expr)
+parseExpr (Parser []) = (Nothing, [UnexpectedEOF], Parser [])
+parseExpr parser =
+    let locatedFirstToken@(Located _ firstToken):_ = tokens parser
+        newparser = parser `advance` 1
     in case firstToken of
-        BoolLiteral _   -> parseBoolExpr locatedFirst tokens
-        NumberLiteral _ -> parseNumberExpr locatedFirst tokens
-        StringLiteral _ -> parseStringExpr locatedFirst tokens
-        OpenParen       -> parseGroupingExpr locatedFirst tokens
-        Minus           -> parseUnaryExpr locatedFirst tokens
-        Bang            -> parseUnaryExpr locatedFirst tokens
-        _               -> (Nothing, [ExpectedExpr])
+        BoolLiteral _   -> newparser `parseBoolExpr` locatedFirstToken
+        NumberLiteral _ -> newparser `parseNumberExpr` locatedFirstToken
+        StringLiteral _ -> newparser `parseStringExpr` locatedFirstToken
+        OpenParen       -> newparser `parseGroupingExpr` locatedFirstToken
+        Minus           -> newparser `parseUnaryExpr` locatedFirstToken
+        Bang            -> newparser `parseUnaryExpr` locatedFirstToken
+        _               -> (Nothing, [Expected "expression"], parser)
 
-parseBoolExpr :: Located Token -> [Located Token] -> (Maybe (Located Expr), [ParseError])
-parseBoolExpr (Located boolSpan boolToken) _ =
+parseBoolExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
+parseBoolExpr parser (Located boolSpan boolToken) =
     case boolToken of
-        BoolLiteral bool -> (Just $ Located boolSpan $ BoolExpr $ Located boolSpan bool, [])
+        BoolLiteral bool -> (Just $ Located boolSpan $ BoolExpr $ Located boolSpan bool, [], parser)
         _ -> error "parse a bool expr where the first token is not a BoolLiteral"
 
-parseNumberExpr :: Located Token -> [Located Token] -> (Maybe (Located Expr), [ParseError])
-parseNumberExpr (Located numberSpan numberToken) _ =
+parseNumberExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
+parseNumberExpr parser (Located numberSpan numberToken) =
     case numberToken of
-        NumberLiteral num -> (Just $ Located numberSpan $ NumberExpr $ Located numberSpan num, [])
+        NumberLiteral num -> (Just $ Located numberSpan $ NumberExpr $ Located numberSpan num, [], parser)
         _ -> error "parse a num expr where the first token is not a NumberLiteral"
 
-parseStringExpr :: Located Token -> [Located Token] -> (Maybe (Located Expr), [ParseError])
-parseStringExpr (Located stringSpan stringToken) _ =
+parseStringExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
+parseStringExpr parser (Located stringSpan stringToken) =
     case stringToken of
-        StringLiteral str -> (Just $ Located stringSpan $ StringExpr $ Located stringSpan str, [])
+        StringLiteral str -> (Just $ Located stringSpan $ StringExpr $ Located stringSpan str, [], parser)
         _ -> error "parse a str expr where the first token is not a StringLiteral"
 
-parseGroupingExpr :: Located Token -> [Located Token] -> (Maybe (Located Expr), [ParseError])
-parseGroupingExpr (Located _ _) nextTokens =
-    let (maybeExpr, errs) = parseExpr nextTokens
-        grouped = (\groupedAndSpan@(Located exprSpan _) -> Located exprSpan $ GroupingExpr groupedAndSpan) <$> maybeExpr
-    in (grouped, errs)
+parseGroupingExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
+parseGroupingExpr parser (Located openParenSpan _) =
+    let (maybeExpr, errs, parser') = parseExpr parser
+        makeGroupExpr grouped (Located closeParenSpan _) = Located (openParenSpan `joinSpan` closeParenSpan) $ GroupingExpr grouped
+        (maybeCloseParen, parser'', parenErrs) = case peek parser' of
+            locatedCloseParen@(Located _ CloseParen) -> (Just locatedCloseParen, parser'' `advance` 1, [])
+            _ -> (Nothing, parser', [Expected "closing parenthesis"])
+        finalGroupedExpr = makeGroupExpr <$> maybeExpr <*> maybeCloseParen
+    in (finalGroupedExpr, errs ++ parenErrs, parser'')
 
-parseUnaryExpr :: Located Token -> [Located Token] -> (Maybe (Located Expr), [ParseError])
-parseUnaryExpr (Located operatorSpan operatorToken) nextTokens =
+parseUnaryExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
+parseUnaryExpr parser (Located operatorSpan operatorToken) =
     let operator = Located operatorSpan $ case operatorToken of
             Bang -> Not
             Minus -> Neg
             _ -> error $ "parse a unary expr with invalid unary operator: " ++ show operatorToken
-        (maybeOperand, operandErrors) = parseExpr nextTokens
+        (maybeOperand, operandErrors, nextParser) = parseExpr parser
         unaryExpr = (\locatedOperand@(Located operandSpan _) -> Located (joinSpan operatorSpan operandSpan) $ UnaryExpr operator locatedOperand) <$> maybeOperand
-    in (unaryExpr, operandErrors)
+    in (unaryExpr, operandErrors, nextParser)
 
