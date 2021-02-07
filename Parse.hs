@@ -93,6 +93,6 @@ parseUnaryExpr parser (Located operatorSpan operatorToken) =
             Minus -> Neg
             _ -> error $ "parse a unary expr with invalid unary operator: " ++ show operatorToken
         (maybeOperand, operandErrors, nextParser) = parseExpr parser
-        unaryExpr = (\locatedOperand@(Located operandSpan _) -> Located (joinSpan operatorSpan operandSpan) $ UnaryExpr operator locatedOperand) <$> maybeOperand
+        unaryExpr = (\locatedOperand@(Located operandSpan _) -> Located (operatorSpan `joinSpan` operandSpan) $ UnaryExpr operator locatedOperand) <$> maybeOperand
     in (unaryExpr, operandErrors, nextParser)
 
