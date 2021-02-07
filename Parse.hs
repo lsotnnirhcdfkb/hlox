@@ -7,8 +7,14 @@ import Diagnostic
 -- note: this parser code is kind of janky
 
 data ParseError = UnexpectedEOF
-                | Expected String
+                | Expected Span String
+                | ExpectedCloseParen Span Span
     deriving (Show)
+
+instance ToError ParseError where
+    toErr UnexpectedEOF = Error Nothing "unexpected EOF while parsing" []
+    toErr (Expected span expect) = Error (Just span) ("expected " ++ expect) []
+    toErr (ExpectedCloseParen notCloseParenSpan toMatch) = Error (Just notCloseParenSpan) "expected closing parenthesis" [Message (Just toMatch) "to match this"]
 
 data Parser = Parser
     { tokens :: [Located Token]
@@ -32,7 +38,7 @@ peek (Parser { tokens = [] }) = error "peek empty parser"
 parseExpr :: Parser -> ParserOutput (Located Expr)
 parseExpr (Parser []) = (Nothing, [UnexpectedEOF], Parser [])
 parseExpr parser =
-    let locatedFirstToken@(Located _ firstToken):_ = tokens parser
+    let locatedFirstToken@(Located firstTokenSpan firstToken):_ = tokens parser
         newparser = parser `advance` 1
     in case firstToken of
         BoolLiteral _   -> newparser `parseBoolExpr` locatedFirstToken
@@ -41,7 +47,7 @@ parseExpr parser =
         OpenParen       -> newparser `parseGroupingExpr` locatedFirstToken
         Minus           -> newparser `parseUnaryExpr` locatedFirstToken
         Bang            -> newparser `parseUnaryExpr` locatedFirstToken
-        _               -> (Nothing, [Expected "expression"], parser)
+        _               -> (Nothing, [Expected firstTokenSpan "expression"], parser)
 
 parseBoolExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
 parseBoolExpr parser (Located boolSpan boolToken) =
@@ -67,7 +73,7 @@ parseGroupingExpr parser (Located openParenSpan _) =
         makeGroupExpr grouped (Located closeParenSpan _) = Located (openParenSpan `joinSpan` closeParenSpan) $ GroupingExpr grouped
         (maybeCloseParen, parser'', parenErrs) = case peek parser' of
             locatedCloseParen@(Located _ CloseParen) -> (Just locatedCloseParen, parser'' `advance` 1, [])
-            _ -> (Nothing, parser', [Expected "closing parenthesis"])
+            (Located notCloseParenSpan _) -> (Nothing, parser', [ExpectedCloseParen notCloseParenSpan openParenSpan])
         finalGroupedExpr = makeGroupExpr <$> maybeExpr <*> maybeCloseParen
     in (finalGroupedExpr, errs ++ parenErrs, parser'')
 

@@ -57,6 +57,7 @@ data Token = OpenParen
            deriving (Show)
 
 data Scanner = Scanner {
+        originalSource :: String,
         sourceLeft :: String,
         currentChar :: Int,
         currentLine :: Int,
@@ -67,8 +68,12 @@ data Scanner = Scanner {
 data ScanError = ScanError (Located String)
     deriving (Show)
 
+instance ToError ScanError where
+    toErr (ScanError (Located errSpan errMsg)) = Error (Just errSpan) errMsg []
+
 scan :: String -> ([Located Token], [ScanError])
 scan source = scan' Scanner {
+        originalSource = source,
         sourceLeft = source,
         currentChar = 0,
         currentLine = 1,
@@ -167,6 +172,7 @@ atEnd _ = False
 
 scannerToLocated :: Scanner -> Int -> a -> Located a
 scannerToLocated scanner thingLength = Located Span {
+        source = originalSource scanner,
         start = currentChar scanner,
         end = currentChar scanner + thingLength,
         line = currentLine scanner,
@@ -188,6 +194,7 @@ errorAndAdvance scanner errLength err =
 advanceScanner :: Scanner -> Int -> Scanner
 advanceScanner scanner 0 = scanner
 advanceScanner scanner 1 = Scanner {
+        originalSource = originalSource scanner,
         sourceLeft = drop 1 $ sourceLeft scanner,
         currentChar = currentChar scanner + 1,
         currentLine = nextLine,
