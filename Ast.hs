@@ -6,9 +6,11 @@ data BinaryOp = Add
               | Sub
               | Mult
               | Div
+              deriving Show
 
 data UnaryOp = Neg
              | Not
+             deriving Show
 
 data Expr = BinaryExpr (Located Expr) (Located BinaryOp) (Located Expr)
           | GroupingExpr (Located Expr)
@@ -16,3 +18,4 @@ data Expr = BinaryExpr (Located Expr) (Located BinaryOp) (Located Expr)
           | NumberExpr (Located Double)
           | StringExpr (Located String)
           | UnaryExpr (Located UnaryOp) (Located Expr)
+          deriving Show
