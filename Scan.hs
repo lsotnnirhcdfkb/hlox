@@ -166,8 +166,7 @@ atEnd (Scanner { sourceLeft = [] }) = True
 atEnd _ = False
 
 scannerToLocated :: Scanner -> Int -> a -> Located a
-scannerToLocated scanner thingLength thing = Located {
-        value = thing,
+scannerToLocated scanner thingLength = Located Span {
         start = currentChar scanner,
         end = currentChar scanner + thingLength,
         line = currentLine scanner,

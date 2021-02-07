@@ -1,29 +1,14 @@
-module Diagnostic (Located(..), copyLocation, unionLocation) where
+module Diagnostic (Located(..), Span(..), joinSpan) where
 
-data Located a =
-    Located {
-        value :: a,
-        start :: Int,
-        end :: Int,
-        line :: Int,
-        col :: Int
-    }
+data Located a = Located Span a
     deriving (Show)
 
-copyLocation :: b -> Located a -> Located b
-copyLocation val loc = Located {
-        value = val,
-        start = start loc,
-        end = end loc,
-        line = line loc,
-        col = col loc
-    }
+data Span = Span
+    { start :: Int
+    , end :: Int
+    , line :: Int
+    , col :: Int
+    } deriving (Show)
 
-unionLocation :: Located a -> Located b -> c -> Located c
-unionLocation a b val = Located {
-        value = val,
-        start = start a,
-        end = end b,
-        line = line a,
-        col = col a
-    }
+joinSpan :: Span -> Span -> Span
+joinSpan a b = a { end = end b }
