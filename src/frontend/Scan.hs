@@ -110,13 +110,14 @@ scan' scanner
         in tokenAndAdvance scanner tokenLength tokenType
 
     | currChar == '/' =
-        if nextChar == '/' then
-            let toNl = findIndex (=='\n') $ sourceLeft scanner
-                commentLength = case toNl of
-                    Just amtToNl -> amtToNl
-                    Nothing      -> length $ sourceLeft scanner
-            in scan' $ advanceScanner scanner commentLength
-        else tokenAndAdvance scanner 1 Slash
+        case nextChar of
+            Just '/' ->
+                let toNl = findIndex (=='\n') $ sourceLeft scanner
+                    commentLength = case toNl of
+                        Just amtToNl -> amtToNl
+                        Nothing      -> length $ sourceLeft scanner
+                in scan' $ advanceScanner scanner commentLength
+            _ -> tokenAndAdvance scanner 1 Slash
 
     | currChar == '"' =
         let afterOpenQuote = drop 1 $ sourceLeft scanner
@@ -164,9 +165,13 @@ scan' scanner
     | otherwise             = errorAndAdvance scanner 1 "bad character"
 
     where
-        currChar = sourceLeft scanner !! 0
-        nextChar = sourceLeft scanner !! 1
-        matchedEq = nextChar == '='
+        currChar = sourceLeft scanner !! 0 -- if sourceLeft scanner does not have any chars, then the atEnd guard would be chosen and this computation would not be necessary, so it cannot crash
+        nextChar = if length (sourceLeft scanner) > 1
+            then Just $ sourceLeft scanner !! 1
+            else Nothing
+        matchedEq = case nextChar of
+            Just '=' -> True
+            _ -> False
 
 atEnd :: Scanner -> Bool
 atEnd (Scanner { sourceLeft = [] }) = True
