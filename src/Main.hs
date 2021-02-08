@@ -2,10 +2,10 @@ module Main where
 
 import System.Environment
 import System.IO
-import Scan
-import Parse
-import Ast
-import Diagnostic
+import Frontend.Scan
+import Frontend.Parse
+import Frontend.Ast
+import Frontend.Diagnostic
 
 main :: IO ()
 main = getArgs >>=

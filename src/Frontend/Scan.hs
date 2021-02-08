@@ -1,8 +1,8 @@
-module Scan (Token(..), scan) where
+module Frontend.Scan (Token(..), scan) where
 
 import Data.List
 import Data.Char(isDigit, isAlpha)
-import Diagnostic
+import Frontend.Diagnostic
 
 data Token = OpenParen
            | CloseParen

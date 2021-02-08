@@ -1,8 +1,8 @@
-module Parse (parse) where
+module Frontend.Parse (parse) where
 
-import Scan
-import Ast
-import Diagnostic
+import Frontend.Scan
+import Frontend.Ast
+import Frontend.Diagnostic
 
 -- note: this parser code is kind of janky
 

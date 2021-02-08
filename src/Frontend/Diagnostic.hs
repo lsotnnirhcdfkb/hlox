@@ -1,4 +1,4 @@
-module Diagnostic
+module Frontend.Diagnostic
     ( Located(..)
     , Span(..)
     , DescriptiveLocation(..)

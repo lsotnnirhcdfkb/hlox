@@ -1,6 +1,6 @@
-module Ast (Expr(..), BinaryOp(..), UnaryOp(..)) where
+module Frontend.Ast (Expr(..), BinaryOp(..), UnaryOp(..)) where
 
-import Diagnostic
+import Frontend.Diagnostic
 
 data BinaryOp = Add
               | Sub
