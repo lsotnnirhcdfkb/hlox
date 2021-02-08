@@ -51,13 +51,13 @@ report (Error messages) =
         formatMessage :: Message -> String
         formatMessage (Message (Just msgLocation) message) =
              lineNrText ++ nthLineOf src msgLine ++ "\n" ++
-             (' ' <$ lineNrText) ++ (' ' <$ [2..msgCol]) ++ (underlineChar <$ [msgStart..msgEnd-1]) ++ " " ++ message ++ "\n"
+             (' ' <$ lineNrText) ++ (' ' <$ [2..msgCol]) ++ underline ++ " " ++ message ++ "\n"
             where
                 lineNrText = show msgLine ++ " (:" ++ show msgCol ++ ") | "
-                (underlineChar, msgSpan) = case msgLocation of
-                    At s -> ('^', s)
-                    After s -> ('>', s)
-                    Before s -> ('<', s)
+                (underline, msgSpan) = case msgLocation of
+                    At s     -> (('^' <$ [msgStart..msgEnd-1])       , s)
+                    After s  -> (('-' <$ [msgStart..msgEnd-2]) ++ ">", s)
+                    Before s -> ("<" ++ ('-' <$ [msgStart..msgEnd-2]), s)
                 (Span src msgStart msgEnd msgLine msgCol) = msgSpan
 
         formatMessage (Message Nothing message) = "<somewhere>: " ++ message ++ "\n"
