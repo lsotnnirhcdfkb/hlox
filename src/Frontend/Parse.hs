@@ -87,34 +87,34 @@ precedenceCall = 11
 precedencePrimary = 12
 
 precedenceOf :: Token -> Int
-precedenceOf BangEqual    = precedenceEquality
-precedenceOf EqualEqual   = precedenceEquality
-precedenceOf Greater      = precedenceComparison
-precedenceOf GreaterEqual = precedenceComparison
-precedenceOf Less         = precedenceComparison
-precedenceOf LessEqual    = precedenceComparison
-precedenceOf Plus         = precedenceTerm
-precedenceOf Minus        = precedenceTerm
-precedenceOf Star         = precedenceFactor
-precedenceOf Slash        = precedenceFactor
-precedenceOf _            = 0
+precedenceOf BangEqual                  = precedenceEquality
+precedenceOf EqualEqual                 = precedenceEquality
+precedenceOf Frontend.Scan.Greater      = precedenceComparison
+precedenceOf Frontend.Scan.GreaterEqual = precedenceComparison
+precedenceOf Frontend.Scan.Less         = precedenceComparison
+precedenceOf Frontend.Scan.LessEqual    = precedenceComparison
+precedenceOf Plus                       = precedenceTerm
+precedenceOf Minus                      = precedenceTerm
+precedenceOf Star                       = precedenceFactor
+precedenceOf Slash                      = precedenceFactor
+precedenceOf _                          = 0
 
 infixParse :: Parser -> Located Expr -> Int -> ParserOutput (Located Expr)
 infixParse parser lhs prec
     | (precedenceOf $ getFirstToken parser) >= prec =
         let locatedOperatorToken@(Located operatorSpan operatorToken):_ = tokens parser
             chosenParseFunc = case operatorToken of
-                BangEqual    -> Just parseBinaryExpr
-                EqualEqual   -> Just parseBinaryExpr
-                Greater      -> Just parseBinaryExpr
-                GreaterEqual -> Just parseBinaryExpr
-                Less         -> Just parseBinaryExpr
-                LessEqual    -> Just parseBinaryExpr
-                Plus         -> Just parseBinaryExpr
-                Minus        -> Just parseBinaryExpr
-                Star         -> Just parseBinaryExpr
-                Slash        -> Just parseBinaryExpr
-                _           -> Nothing
+                BangEqual                  -> Just parseBinaryExpr
+                EqualEqual                 -> Just parseBinaryExpr
+                Frontend.Scan.Greater      -> Just parseBinaryExpr
+                Frontend.Scan.GreaterEqual -> Just parseBinaryExpr
+                Frontend.Scan.Less         -> Just parseBinaryExpr
+                Frontend.Scan.LessEqual    -> Just parseBinaryExpr
+                Plus                       -> Just parseBinaryExpr
+                Minus                      -> Just parseBinaryExpr
+                Star                       -> Just parseBinaryExpr
+                Slash                      -> Just parseBinaryExpr
+                _                          -> Nothing
         in case chosenParseFunc of
                 Just func ->
                     let (maybeInfixParsed, infixErrors, afterInfixParser) = func (parser `advance` 1) lhs locatedOperatorToken
@@ -127,11 +127,16 @@ infixParse parser lhs prec
 parseBinaryExpr :: Parser -> Located Expr -> Located Token -> ParserOutput (Located Expr)
 parseBinaryExpr parser locatedLhs@(Located lhsSpan lhs) locatedOperator@(Located operatorSpan operatorToken) =
     let (binaryOperator', rhsOf) = case operatorToken of
-            Plus  -> (Add, "addition")
-            Minus -> (Sub, "subtraction")
-            Star  -> (Mult, "multiplication")
-            Slash -> (Div, "division")
-            -- TODO: support other operators
+            Plus                       -> (Add, "addition")
+            Minus                      -> (Sub, "subtraction")
+            Star                       -> (Mult, "multiplication")
+            Slash                      -> (Div, "division")
+            BangEqual                  -> (Frontend.Ast.NotEqual, "equality")
+            EqualEqual                 -> (Frontend.Ast.Equal, "equality")
+            Frontend.Scan.Greater      -> (Frontend.Ast.Greater, "comparison")
+            Frontend.Scan.GreaterEqual -> (Frontend.Ast.GreaterEqual, "comparison")
+            Frontend.Scan.Less         -> (Frontend.Ast.Less, "comparison")
+            Frontend.Scan.LessEqual    -> (Frontend.Ast.LessEqual, "comparison")
             _     -> error "invalid binary operator"
         binaryOperator = Located operatorSpan binaryOperator'
         (maybeRhs, rhsErrors, rhsParser) = parseExpr parser (precedenceOf operatorToken + 1) $ "right hand side to " ++ rhsOf ++ " expression"

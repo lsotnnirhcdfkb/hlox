@@ -6,6 +6,12 @@ data BinaryOp = Add
               | Sub
               | Mult
               | Div
+              | NotEqual
+              | Equal
+              | Greater
+              | GreaterEqual
+              | Less
+              | LessEqual
               deriving Show
 
 data UnaryOp = Neg
