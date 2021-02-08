@@ -181,7 +181,7 @@ scannerToLocated :: Scanner -> Int -> a -> Located a
 scannerToLocated scanner thingLength = Located Span {
         source = originalSource scanner,
         start = currentChar scanner,
-        end = currentChar scanner + thingLength,
+        len = thingLength,
         line = currentLine scanner,
         col = currentColumn scanner
     }

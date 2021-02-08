@@ -28,13 +28,13 @@ data DescriptiveLocation = At Span
 data Span = Span
             { source :: String
             , start :: Int
-            , end :: Int
+            , len :: Int
             , line :: Int
             , col :: Int
             } deriving (Show)
 
 joinSpan :: Span -> Span -> Span
-joinSpan a b = a { end = end b }
+joinSpan a b = a { len = (start b + len b) - start a }
 
 nthLineOf :: String -> Int -> String
 nthLineOf src n
@@ -54,11 +54,23 @@ report (Error messages) =
              (' ' <$ lineNrText) ++ (' ' <$ [2..msgCol]) ++ underline ++ " " ++ message ++ "\n"
             where
                 lineNrText = show msgLine ++ " (:" ++ show msgCol ++ ") | "
-                (underline, msgSpan) = case msgLocation of
-                    At s     -> (('^' <$ [msgStart..msgEnd-1])       , s)
-                    After s  -> (('-' <$ [msgStart..msgEnd-2]) ++ ">", s)
-                    Before s -> ("<" ++ ('-' <$ [msgStart..msgEnd-2]), s)
-                (Span src msgStart msgEnd msgLine msgCol) = msgSpan
+                msgSpan = case msgLocation of
+                    At s -> s
+                    After s -> s
+                    Before s -> s
+
+                (Span src _ msgLen msgLine msgCol) = msgSpan
+
+                underline = case msgLocation of
+                    At _ -> '^' <$ [1..msgLen]
+
+                    After _ -- easier just to do it manually, probably clearer and easier to understand as well
+                        | msgLen == 0 -> ">"
+                        | msgLen == 1 -> ">"
+                        | msgLen == 2 -> "->"
+                        | otherwise   -> "`" ++ ('-' <$ [1..msgLen-2]) ++ ">"
+
+                    Before _ -> "<" ++ ('-' <$ [1..msgLen-1])
 
         formatMessage (Message Nothing message) = "<somewhere>: " ++ message ++ "\n"
 
