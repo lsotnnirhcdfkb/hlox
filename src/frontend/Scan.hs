@@ -129,7 +129,7 @@ scan' scanner
     | isDigit currChar =
         let digits = takeWhile isDigit $ sourceLeft scanner
             amtIntDigits = length digits
-            hasFloat = length (sourceLeft scanner) > 2 && sourceLeft scanner !! amtIntDigits == '.' && (isDigit $ sourceLeft scanner !! (amtIntDigits + 1))
+            hasFloat = (length (sourceLeft scanner) > amtIntDigits) && (sourceLeft scanner !! amtIntDigits == '.') && (isDigit $ sourceLeft scanner !! (amtIntDigits + 1))
             allDigits = if hasFloat
                 then
                     let floatingComponent = takeWhile isDigit $ drop (amtIntDigits + 1) $ sourceLeft scanner
