@@ -8,7 +8,8 @@ import Diagnostic
 
 data ParseError = Expected DescriptiveLocation String (Maybe String)
                 | ExpectedCloseParen Span Span
-    deriving (Show)
+                | UnaryPlusUnsupported Span
+                deriving (Show)
 
 instance ToError ParseError where
     toErr (Expected location expect representing) = Error
@@ -21,6 +22,10 @@ instance ToError ParseError where
     toErr (ExpectedCloseParen needParenSpan toMatch) = Error
         [ Message (Just $ After needParenSpan) "expected ')'"
         , Message (Just $ At toMatch) "to match this"
+        ]
+
+    toErr (UnaryPlusUnsupported plusSpan) = Error
+        [ Message (Just $ At plusSpan) "unary + is not supported"
         ]
 
 data Parser = Parser
@@ -61,6 +66,7 @@ prefixParse parser representing =
             OpenParen       -> Just parseGroupingExpr
             Minus           -> Just parseUnaryExpr
             Bang            -> Just parseUnaryExpr
+            Plus            -> Just parseUnaryPositiveExpr
             _               -> Nothing
     in case chosenPrefixParseFunc of
         Just func -> (parser `advance` 1) `func` locatedFirstToken
@@ -146,3 +152,7 @@ parseUnaryExpr parser (Located operatorSpan operatorToken) =
         unaryExpr = (\locatedOperand@(Located operandSpan _) -> Located (operatorSpan `joinSpan` operandSpan) $ UnaryExpr operator locatedOperand) <$> maybeOperand
     in (unaryExpr, operandErrors, nextParser)
 
+parseUnaryPositiveExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
+parseUnaryPositiveExpr parser (Located operatorSpan operatorToken) =
+    let (_, operandErrors, nextParser) = parseExpr parser (precedenceOf Minus) $ "operand to unary + expression"
+    in (Nothing, (UnaryPlusUnsupported operatorSpan):operandErrors, nextParser)
