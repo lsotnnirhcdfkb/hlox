@@ -76,8 +76,8 @@ getFirstToken :: Parser -> Token
 getFirstToken (Parser ((Located _ tok):_)) = tok
 
 precedenceOf :: Token -> Int
-precedenceOf Minus = 5
 precedenceOf Plus = 5
+precedenceOf Minus = 5
 precedenceOf Star = 6
 precedenceOf Slash = 6
 precedenceOf Bang = 7
@@ -86,7 +86,7 @@ precedenceOf _ = 0
 
 infixParse :: Parser -> Located Expr -> Int -> ParserOutput (Located Expr)
 infixParse parser lhs prec
-    | (precedenceOf $ getFirstToken parser) > prec =
+    | (precedenceOf $ getFirstToken parser) >= prec =
         let locatedOperatorToken@(Located operatorSpan operatorToken):_ = tokens parser
             chosenParseFunc = case operatorToken of
                 Plus        -> Just parseBinaryExpr
