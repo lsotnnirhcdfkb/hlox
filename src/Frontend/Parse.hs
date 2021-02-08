@@ -75,24 +75,45 @@ prefixParse parser representing =
 getFirstToken :: Parser -> Token
 getFirstToken (Parser ((Located _ tok):_)) = tok
 
+precedenceAssignment = 1
+precedenceOr = 2
+precedenceAnd = 3
+precedenceEquality = 4
+precedenceComparison = 5
+precedenceTerm = 6
+precedenceFactor = 9
+precedenceUnary = 10
+precedenceCall = 11
+precedencePrimary = 12
+
 precedenceOf :: Token -> Int
-precedenceOf Plus = 5
-precedenceOf Minus = 5
-precedenceOf Star = 6
-precedenceOf Slash = 6
-precedenceOf Bang = 7
-precedenceOf Minus = 7
-precedenceOf _ = 0
+precedenceOf BangEqual    = precedenceEquality
+precedenceOf EqualEqual   = precedenceEquality
+precedenceOf Greater      = precedenceComparison
+precedenceOf GreaterEqual = precedenceComparison
+precedenceOf Less         = precedenceComparison
+precedenceOf LessEqual    = precedenceComparison
+precedenceOf Plus         = precedenceTerm
+precedenceOf Minus        = precedenceTerm
+precedenceOf Star         = precedenceFactor
+precedenceOf Slash        = precedenceFactor
+precedenceOf _            = 0
 
 infixParse :: Parser -> Located Expr -> Int -> ParserOutput (Located Expr)
 infixParse parser lhs prec
     | (precedenceOf $ getFirstToken parser) >= prec =
         let locatedOperatorToken@(Located operatorSpan operatorToken):_ = tokens parser
             chosenParseFunc = case operatorToken of
-                Plus        -> Just parseBinaryExpr
-                Minus       -> Just parseBinaryExpr
-                Star        -> Just parseBinaryExpr
-                Slash       -> Just parseBinaryExpr
+                BangEqual    -> Just parseBinaryExpr
+                EqualEqual   -> Just parseBinaryExpr
+                Greater      -> Just parseBinaryExpr
+                GreaterEqual -> Just parseBinaryExpr
+                Less         -> Just parseBinaryExpr
+                LessEqual    -> Just parseBinaryExpr
+                Plus         -> Just parseBinaryExpr
+                Minus        -> Just parseBinaryExpr
+                Star         -> Just parseBinaryExpr
+                Slash        -> Just parseBinaryExpr
                 _           -> Nothing
         in case chosenParseFunc of
                 Just func ->
@@ -110,6 +131,7 @@ parseBinaryExpr parser locatedLhs@(Located lhsSpan lhs) locatedOperator@(Located
             Minus -> (Sub, "subtraction")
             Star  -> (Mult, "multiplication")
             Slash -> (Div, "division")
+            -- TODO: support other operators
             _     -> error "invalid binary operator"
         binaryOperator = Located operatorSpan binaryOperator'
         (maybeRhs, rhsErrors, rhsParser) = parseExpr parser (precedenceOf operatorToken + 1) $ "right hand side to " ++ rhsOf ++ " expression"
@@ -154,5 +176,5 @@ parseUnaryExpr parser (Located operatorSpan operatorToken) =
 
 parseUnaryPositiveExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
 parseUnaryPositiveExpr parser (Located operatorSpan operatorToken) =
-    let (_, operandErrors, nextParser) = parseExpr parser (precedenceOf Minus) $ "operand to unary + expression"
+    let (_, operandErrors, nextParser) = parseExpr parser precedenceUnary $ "operand to unary + expression"
     in (Nothing, (UnaryPlusUnsupported operatorSpan):operandErrors, nextParser)
