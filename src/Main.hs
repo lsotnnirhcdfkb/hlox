@@ -1,6 +1,7 @@
 module Main where
 
 import System.Environment
+import System.IO
 import Scan
 import Parse
 import Ast
@@ -14,7 +15,7 @@ main = getArgs >>=
         _       -> putStrLn "bad usage"
 
 repl :: IO ()
-repl = getLine >>= run >> repl
+repl = putStr "> " >> hFlush stdout >> getLine >>= run >> repl
 
 runFile :: String -> IO ()
 runFile fileName = readFile fileName >>= run
