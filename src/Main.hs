@@ -4,7 +4,6 @@ import System.Environment
 import System.IO
 import Frontend.Scan
 import Frontend.Parse
-import Frontend.Ast
 import Frontend.Diagnostic
 import Treewalk.Interpret
 
@@ -22,17 +21,25 @@ runFile :: String -> IO ()
 runFile fileName = readFile fileName >>= run
 
 run :: String -> IO ()
-run source = reportErrors >> (putStrLn $ show treewalked)
-    where
-        (scanned, scanErrors') = scan source
+run source =
+    let (scanned, scanErrors') = scan source
         scanErrors = map toErr scanErrors'
 
         (parsed, parseErrors') = parse scanned
         parseErrors = map toErr parseErrors'
 
-        treewalked = interpret <$> parsed
+        beforeRunErrs = scanErrors ++ parseErrors
+        reportBeforeRunErrs = mapM_ report beforeRunErrs
+        beforeRunSuccess = length beforeRunErrs == 0
 
-        totalErrors = scanErrors ++ parseErrors
-        reportErrors = mapM_ report totalErrors
+        treewalked = if beforeRunSuccess
+        then case parsed of
+                Just ast -> Just $ interpret ast
+                _ -> error "parsed is Nothing but there are no before run errors"
+        else Nothing
+    in reportBeforeRunErrs >>= \_ ->
+    case treewalked of
+        Just (Right res) -> putStrLn $ show res
+        Just (Left runErr) -> report $ toErr runErr
+        _ -> return ()
 
-        success = length totalErrors == 0
