@@ -5,21 +5,20 @@ import Frontend.Diagnostic
 import Runtime.Value
 
 interpret :: Located Expr -> LoxValue
-interpret (Located _ (BinaryExpr lhs (Located _ operator) rhs)) =
+interpret (Located _ (BinaryExpr lhs (Located operatorSpan operator) rhs)) =
     let lhsEval = interpret lhs
         rhsEval = interpret rhs
-        lhsDouble = case lhsEval of
-            LoxNumber d -> d
-            _ -> error "invalid cast"
-        rhsDouble = case rhsEval of
-            LoxNumber d -> d
-            _ -> error "invalid cast"
+        (lhsDouble, rhsDouble) = checkOperandsDouble operatorSpan lhsEval rhsEval
 
     in case operator of
-        Add  -> LoxNumber $ lhsDouble + rhsDouble
         Sub  -> LoxNumber $ lhsDouble - rhsDouble
         Mult -> LoxNumber $ lhsDouble * rhsDouble
         Div  -> LoxNumber $ lhsDouble / rhsDouble
+
+        Add -> case (lhsEval, rhsEval) of
+            (LoxNumber lhsDouble, LoxNumber rhsDouble) -> LoxNumber $ lhsDouble + rhsDouble
+            (LoxString lhsStr, LoxString rhsStr) -> LoxString $ lhsStr ++ rhsStr
+            _ -> error "Operands must be two numbers or two strings"
 
         Greater      -> LoxBool $ lhsDouble > rhsDouble
         GreaterEqual -> LoxBool $ lhsDouble >= rhsDouble
@@ -35,7 +34,7 @@ interpret (Located _ (UnaryExpr (Located _ operator) operand)) =
         Neg ->
             case operandValue of
                 LoxNumber d -> LoxNumber $ -d
-                _ -> error "invalid cast"
+                _ -> error "Operand must be a number"
 
         Not -> LoxBool $ not (isTruthy operandValue)
 
@@ -48,3 +47,7 @@ isTruthy :: LoxValue -> Bool
 isTruthy LoxNil = False
 isTruthy (LoxBool b) = b
 isTruthy _ = True
+
+checkOperandsDouble :: Span -> LoxValue -> LoxValue -> (Double, Double)
+checkOperandsDouble _ (LoxNumber lhs) (LoxNumber rhs) = (lhs, rhs)
+checkOperandsDouble _ _ _ = error "Operands must be numbers"
