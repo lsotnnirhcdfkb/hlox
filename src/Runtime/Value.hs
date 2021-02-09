@@ -15,5 +15,7 @@ stringifyType (LoxString _) = "string"
 stringifyValue :: LoxValue -> String
 stringifyValue LoxNil = "nil"
 stringifyValue (LoxBool b) = if b then "true" else "false"
-stringifyValue (LoxNumber n) = show n
+stringifyValue (LoxNumber n)
+    | n == (fromIntegral $ (floor n :: Integer)) = show $ (floor n :: Integer)
+    | otherwise = show n
 stringifyValue (LoxString s) = s

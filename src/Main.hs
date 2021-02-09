@@ -6,6 +6,7 @@ import Frontend.Scan
 import Frontend.Parse
 import Frontend.Diagnostic
 import Treewalk.Interpret
+import Runtime.Value
 
 main :: IO ()
 main = getArgs >>=
@@ -39,7 +40,7 @@ run source =
         else Nothing
     in reportBeforeRunErrs >>
     case treewalked of
-        Just (Right res) -> putStrLn $ show res
+        Just (Right (Located _ res)) -> putStrLn $ stringifyValue res
         Just (Left runErr) -> report $ toErr runErr
         _ -> return ()
 
