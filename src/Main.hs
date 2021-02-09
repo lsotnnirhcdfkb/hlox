@@ -37,7 +37,7 @@ run source =
                 Just ast -> Just $ interpret ast
                 _ -> error "parsed is Nothing but there are no before run errors"
         else Nothing
-    in reportBeforeRunErrs >>= \_ ->
+    in reportBeforeRunErrs >>
     case treewalked of
         Just (Right res) -> putStrLn $ show res
         Just (Left runErr) -> report $ toErr runErr
