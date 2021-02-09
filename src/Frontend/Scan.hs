@@ -68,7 +68,7 @@ data Scanner = Scanner {
 data ScanError = ScanError (Located String)
     deriving (Show)
 
-instance ToError ScanError where
+instance LoxError ScanError where
     toErr (ScanError (Located errSpan errMsg)) = Error
         [ Message (Just $ At errSpan) errMsg
         ]

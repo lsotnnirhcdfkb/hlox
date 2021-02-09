@@ -6,12 +6,12 @@ module Frontend.Diagnostic
     , Error(..)
     , Message(..)
     , report
-    , ToError(toErr)
+    , LoxError(toErr)
     ) where
 
 import Data.List(foldl')
 
-class ToError e where
+class LoxError e where
     toErr :: e -> Error
 
 data Located a = Located Span a

@@ -11,7 +11,7 @@ data ParseError = Expected DescriptiveLocation String (Maybe String)
                 | UnaryPlusUnsupported Span
                 deriving (Show)
 
-instance ToError ParseError where
+instance LoxError ParseError where
     toErr (Expected location expect representing) = Error
         [ Message (Just location) $ "expected " ++ expect ++ representingStr
         ]
