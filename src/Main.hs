@@ -36,9 +36,3 @@ run source = reportErrors >> (putStrLn $ show treewalked)
         reportErrors = mapM_ report totalErrors
 
         success = length totalErrors == 0
-        printAST (BinaryExpr (Located _ lhs) (Located _ op) (Located _ rhs)) = "(" ++ show op ++ " " ++ printAST lhs ++ " " ++ printAST rhs ++ ")"
-        printAST (GroupingExpr (Located _ e)) = "(" ++ printAST e ++ ")"
-        printAST (BoolExpr (Located _ b)) = show b
-        printAST (NumberExpr (Located _ n)) = show n
-        printAST (StringExpr (Located _ s)) = "\"" ++ s ++ "\""
-        printAST (UnaryExpr (Located _ operator) (Located _ operand)) = "(" ++ show operator ++ " " ++ printAST operand ++ ")"
