@@ -7,24 +7,17 @@ import qualified Interpreter
 
 readInterpreterSettings :: Args String -> Either String Interpreter.InterpreterSettings
 readInterpreterSettings args =
-    let errorFormatStr = getRequiredArg args "errformat" :: String
-        backendStr = getRequiredArg args "backend" :: String
+    let backendStr = getRequiredArg args "backend" :: String
         interpretingFile = getArg args "file" :: Maybe String
 
-    in (case errorFormatStr of
-            "default" -> Right Interpreter.DefaultErrorFormat
-            "original" -> Left "original error format is not implemented (yet)"
-            _ -> Left $ "invalid error format: '" ++ errorFormatStr ++ "'"
-        ) >>= \errorFormat ->
-        (case backendStr of
+    in (case backendStr of
             "treewalk" -> Right Interpreter.Treewalk
             "stackbc" -> Left "stack bytecode interpreter is not implemented (yet)"
             "registerbc" -> Left "register bytecode interpreter is not implemented (yet)"
             _ -> Left $ "invalid backend: '" ++ backendStr ++ "'"
         ) >>= \backend ->
         Right Interpreter.InterpreterSettings
-        { Interpreter.errorFormat = errorFormat
-        , Interpreter.backend = backend
+        { Interpreter.backend = backend
         , Interpreter.file = interpretingFile
         }
 
@@ -43,13 +36,6 @@ main =
                      , apcDash = ArgsHardDash
                      }
         argsSpec = [ Arg
-                     { argIndex = "errformat"
-                     , argAbbr = Just 'e'
-                     , argName = Just "error-format"
-                     , argData = argDataDefaulted "format" ArgtypeString "default"
-                     , argDesc = "the error format"
-                     }
-                   , Arg
                      { argIndex = "backend"
                      , argAbbr = Just 'b'
                      , argName = Just "backend"

@@ -1,7 +1,6 @@
 module Interpreter
     ( interpret
     , InterpreterSettings(..)
-    , ErrorFormat(..)
     , Backend(..)
     ) where
 
@@ -14,13 +13,10 @@ import qualified Treewalk.Interpret
 import Runtime.Value
 
 data InterpreterSettings = InterpreterSettings
-                           { errorFormat :: ErrorFormat
-                           , backend :: Backend
+                           { backend :: Backend
                            , file :: Maybe String
                            }
 
-data ErrorFormat = DefaultErrorFormat | OriginalErrorFormat
-                 deriving Show
 data Backend = Treewalk | StackBC | RegisterBC
              deriving Show
 
