@@ -88,9 +88,10 @@ interpretExpr (Located groupingSpan (GroupingExpr expr)) =
     interpretExpr expr >>= \(Located _ insideValue) ->
     Right $ Located groupingSpan $ insideValue
 
-interpretExpr (Located span (BoolExpr (Located _ b))) = Right $ Located span $ LoxBool b
-interpretExpr (Located span (NumberExpr (Located _ n))) = Right $ Located span $ LoxNumber n
-interpretExpr (Located span (StringExpr (Located _ s))) = Right $ Located span $ LoxString s
+interpretExpr (Located span (BoolExpr b)) = Right $ Located span $ LoxBool b
+interpretExpr (Located span (NumberExpr n)) = Right $ Located span $ LoxNumber n
+interpretExpr (Located span (StringExpr s)) = Right $ Located span $ LoxString s
+interpretExpr (Located span NilExpr) = Right $ Located span LoxNil
 
 isTruthy :: LoxValue -> Bool
 isTruthy LoxNil = False

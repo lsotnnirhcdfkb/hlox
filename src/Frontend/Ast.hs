@@ -20,9 +20,10 @@ data UnaryOp = Neg
 
 data Expr = BinaryExpr (Located Expr) (Located BinaryOp) (Located Expr)
           | GroupingExpr (Located Expr)
-          | BoolExpr (Located Bool)
-          | NumberExpr (Located Double)
-          | StringExpr (Located String)
+          | BoolExpr Bool
+          | NumberExpr Double
+          | StringExpr String
+          | NilExpr
           | UnaryExpr (Located UnaryOp) (Located Expr)
           deriving Show
 

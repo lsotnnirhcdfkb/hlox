@@ -34,7 +34,7 @@ data Token = OpenParen
            | StringLiteral String
            | NumberLiteral Double
            | BoolLiteral Bool
-           | Nil
+           | NilLiteral
 
            | Super
            | This
@@ -148,7 +148,7 @@ scan' scanner
                 "for" -> For
                 "fun" -> Fun
                 "if" -> If
-                "nil" -> Nil
+                "nil" -> NilLiteral
                 "or" -> Or
                 "print" -> Print
                 "return" -> Return

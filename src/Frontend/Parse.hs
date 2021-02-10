@@ -116,6 +116,7 @@ prefixParse parser representing =
             BoolLiteral _   -> Just parseTokenExpr
             NumberLiteral _ -> Just parseTokenExpr
             StringLiteral _ -> Just parseTokenExpr
+            NilLiteral      -> Just parseTokenExpr
             OpenParen       -> Just parseGroupingExpr
             Minus           -> Just parseUnaryExpr
             Bang            -> Just parseUnaryExpr
@@ -196,9 +197,10 @@ parseBinaryExpr parser locatedLhs@(Located lhsSpan _) locatedOperator@(Located o
 parseTokenExpr :: Parser -> Located Token -> ParserOutput (Maybe (Located Expr))
 parseTokenExpr parser (Located tokenSpan token) =
     let expr = case token of
-            BoolLiteral bool  -> BoolExpr $ Located tokenSpan bool
-            NumberLiteral num -> NumberExpr $ Located tokenSpan num
-            StringLiteral str -> StringExpr $ Located tokenSpan str
+            BoolLiteral bool  -> BoolExpr bool
+            NumberLiteral num -> NumberExpr num
+            StringLiteral str -> StringExpr str
+            NilLiteral -> NilExpr
             _ -> error "parse a bool expr where the first token is not a BoolLiteral"
     in (Just $ Located tokenSpan expr, [], parser)
 
