@@ -36,12 +36,27 @@ parse :: [Located Token] -> ([Located Stmt], [ParseError])
 parse tokens = (outputAST, errors)
     where
         parser = Parser tokens
-        (outputAST, errors, _) = parseStmts parser
+        (outputAST, errors, _) = parseDecls parser
 
 type ParserOutput a = (a, [ParseError], Parser)
 
 advance :: Parser -> Int -> Parser
 advance (Parser tokens) n = Parser $ drop n tokens
+
+synchronize :: Parser -> Parser
+synchronize parser =
+    case getFirstToken parser of
+        Eof -> parser
+        Class -> parser
+        Fun -> parser
+        Var -> parser
+        For -> parser
+        If -> parser
+        While -> parser
+        Print -> parser
+        Return -> parser
+        Semicolon -> parser `advance` 1
+        _ -> synchronize $ parser `advance` 1
 
 peek :: Parser -> Located Token
 peek (Parser { tokens = (firstToken:_) }) = firstToken
@@ -51,21 +66,46 @@ getFirstToken :: Parser -> Token
 getFirstToken (Parser []) = error "get first token of empty parser, which should never happen"
 getFirstToken (Parser ((Located _ tok):_)) = tok
 
-parseStmts :: Parser -> ParserOutput [Located Stmt]
-parseStmts parser =
+parseDecls :: Parser -> ParserOutput [Located Stmt]
+parseDecls parser =
     case getFirstToken parser of
         Eof -> ([], [], parser)
         _ ->
-            let (maybeStmt, singleErrs, parser') = parseStmt parser
-                (nextStmts, nextErrs, parser'') = parseStmts parser'
+            let (maybeDecl, singleErrs, parser') = parseDecl parser
+            in case maybeDecl of
+                Just s ->
+                    let (nextDecls, nextErrs, parser'') = parseDecls parser'
+                    in (s:nextDecls, singleErrs ++ nextErrs, parser'')
 
-                totalStmts = case maybeStmt of
-                    Just s -> s:nextStmts
-                    Nothing -> nextStmts
+                Nothing ->
+                    let (nextDecls, nextErrs, parser'') = parseDecls $ synchronize parser'
+                    in (nextDecls, singleErrs ++ nextErrs, parser'')
 
-                totalErrs = singleErrs ++ nextErrs
 
-            in (totalStmts, totalErrs, parser'')
+parseDecl :: Parser -> ParserOutput (Maybe (Located Stmt))
+parseDecl parser =
+    let first = getFirstToken parser
+    in case first of
+        Var -> parseVarDecl parser
+        _ -> parseStmt parser
+
+parseVarDecl :: Parser -> ParserOutput (Maybe (Located Stmt))
+parseVarDecl parser =
+    let (Located varSpan _) = peek parser
+    in case peek $ parser `advance` 1 of
+        Located nameSpan (Identifier name) ->
+            let (maybeInitializer, initializerErrs, parser', lastSpan) =
+                    case getFirstToken $ parser `advance` 2 of
+                        Frontend.Scan.Equal ->
+                            let (maybeExpr, exprErrs, parser'') = parseExpr (parser `advance` 3) 0 "variable initializer"
+                            in case maybeExpr of
+                                Just (Located sp _) -> (maybeExpr, exprErrs, parser'', sp)
+                                Nothing -> (maybeExpr, exprErrs, parser'', nameSpan)
+                        _ -> (Nothing, [], parser `advance` 2, nameSpan)
+            in case peek parser' of
+                Located semiSpan Semicolon -> (Just $ Located (varSpan `joinSpan` semiSpan) $ VarStmt (Located nameSpan name) maybeInitializer, initializerErrs, parser' `advance` 1)
+                _ -> (Nothing, initializerErrs ++ [Expected (After lastSpan) "';'" Nothing], parser')
+        _ -> (Nothing, [Expected (After varSpan) "variable name" Nothing], parser `advance` 1)
 
 parseStmt :: Parser -> ParserOutput (Maybe (Located Stmt))
 parseStmt parser =
@@ -116,6 +156,7 @@ prefixParse parser representing =
             NumberLiteral _ -> Just parseTokenExpr
             StringLiteral _ -> Just parseTokenExpr
             NilLiteral      -> Just parseTokenExpr
+            Identifier _    -> Just parseTokenExpr
             OpenParen       -> Just parseGroupingExpr
             Minus           -> Just parseUnaryExpr
             Bang            -> Just parseUnaryExpr
@@ -200,6 +241,7 @@ parseTokenExpr parser (Located tokenSpan token) =
             NumberLiteral num -> NumberExpr num
             StringLiteral str -> StringExpr str
             NilLiteral -> NilExpr
+            Identifier name -> VarExpr name
             _ -> error "parse a bool expr where the first token is not a BoolLiteral"
     in (Just $ Located tokenSpan expr, [], parser)
 

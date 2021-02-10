@@ -25,8 +25,10 @@ data Expr = BinaryExpr (Located Expr) (Located BinaryOp) (Located Expr)
           | StringExpr String
           | NilExpr
           | UnaryExpr (Located UnaryOp) (Located Expr)
+          | VarExpr String
           deriving Show
 
 data Stmt = PrintStmt (Located Expr)
           | ExprStmt (Located Expr)
+          | VarStmt (Located String) (Maybe (Located Expr))
           deriving Show

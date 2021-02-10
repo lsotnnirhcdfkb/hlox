@@ -4,6 +4,8 @@ module Treewalk.Interpret
     , interpretScript
     ) where
 
+import qualified Data.Map as Map
+
 import Frontend.Ast
 import Frontend.Diagnostic
 import Runtime.Value
@@ -12,8 +14,12 @@ import Treewalk.State
 
 interpretScript :: [Located Stmt] -> IO (Either RuntimeError ())
 interpretScript stmts =
-    interpretStmts InterpreterState {} stmts >>= \ei ->
+    interpretStmts baseState stmts >>= \ei ->
     return $ ei >> Right ()
+    where
+        baseState = InterpreterState
+                    { vars = Map.empty
+                    }
 
 interpretStmts :: InterpreterState -> [Located Stmt] -> IO (Either RuntimeError InterpreterState)
 interpretStmts state (stmt:stmts) =
@@ -34,6 +40,13 @@ interpretStmt state (Located _ (PrintStmt expr)) =
 
 interpretStmt state (Located _ (ExprStmt expr)) =
     return $ interpretExpr expr >> Right state
+
+interpretStmt state (Located _ (VarStmt (Located nameSpan varName) maybeInitializer)) =
+    let eiInit = case maybeInitializer of
+            Just init -> interpretExpr init
+            Nothing -> Right $ Located nameSpan LoxNil
+    in return $ eiInit >>= \(Located _ initializer) ->
+    Right $ defineVar state varName initializer
 
 interpretExpr :: Located Expr -> Either RuntimeError (Located LoxValue)
 interpretExpr (Located outSpan (BinaryExpr lhs@(Located _ _) (Located operatorSpan operator) rhs@(Located _ _))) =
@@ -76,13 +89,13 @@ interpretExpr (Located outSpan (BinaryExpr lhs@(Located _ _) (Located operatorSp
     where
         out value = Right $ Located outSpan value
 
-interpretExpr (Located outSpan (UnaryExpr (Located _ operator) operandAST)) =
-    interpretExpr operandAST >>= \(Located _ operandValue) ->
+interpretExpr (Located outSpan (UnaryExpr (Located operatorSpan operator) operandAST)) =
+    interpretExpr operandAST >>= \locatedOperand@(Located _ operandValue) ->
     case operator of
         Neg ->
             case operandValue of
                 LoxNumber d -> Right $ Located outSpan $ LoxNumber $ -d
-                _ -> error "Operand must be a number"
+                _ -> Left $ OperandMustBeNumber operatorSpan locatedOperand
 
         Not -> Right $ Located outSpan $ LoxBool $ not (isTruthy operandValue)
 
@@ -94,6 +107,7 @@ interpretExpr (Located span (BoolExpr b)) = Right $ Located span $ LoxBool b
 interpretExpr (Located span (NumberExpr n)) = Right $ Located span $ LoxNumber n
 interpretExpr (Located span (StringExpr s)) = Right $ Located span $ LoxString s
 interpretExpr (Located span NilExpr) = Right $ Located span LoxNil
+interpretExpr (Located span (VarExpr name)) = Left $ UndefinedVariable $ Located span name
 
 isTruthy :: LoxValue -> Bool
 isTruthy LoxNil = False
