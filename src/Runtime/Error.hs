@@ -11,16 +11,11 @@ data RuntimeError = OperandsMustBeNumbersOrStrings Span (Located LoxValue) (Loca
 
 instance LoxError RuntimeError where
     toErr (OperandsMustBeNumbersOrStrings operatorSpan (Located lhsSpan lhsValue) (Located rhsSpan rhsValue)) = Error
-        [ Message (Just $ At operatorSpan) "Operands must be two numbers or two strings."
-        , Message (Just $ At lhsSpan) $ "a " ++ stringifyType lhsValue
-        , Message (Just $ At rhsSpan) $ "a " ++ stringifyType rhsValue
+        [ Message (Just $ At operatorSpan) $ "Operands must be two numbers or two strings (" ++ stringifyType lhsValue ++ " and " ++ stringifyType rhsValue ++ " invalid)."
         ]
     toErr (OperandsMustBeNumbers operatorSpan (Located lhsSpan lhsValue) (Located rhsSpan rhsValue)) = Error
-        [ Message (Just $ At operatorSpan) "Operands must be numbers."
-        , Message (Just $ At lhsSpan) $ "a " ++ stringifyType lhsValue
-        , Message (Just $ At rhsSpan) $ "a " ++ stringifyType rhsValue
+        [ Message (Just $ At operatorSpan) $ "Operands must be numbers (" ++ stringifyType lhsValue ++ " and " ++ stringifyType rhsValue ++ " invalid)."
         ]
     toErr (OperandMustBeNumber operatorSpan (Located operandSpan operandValue)) = Error
-        [ Message (Just $ At operatorSpan) "Operand must be a number."
-        , Message (Just $ At operandSpan) $ "a " ++ stringifyType operandValue
+        [ Message (Just $ At operatorSpan) $ "Operand must be a number (" ++ stringifyType operandValue ++ " invalid)."
         ]
