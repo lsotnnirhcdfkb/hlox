@@ -24,6 +24,7 @@ executable hlox
                      , Frontend.Ast
                      , Frontend.Parse
                      , Treewalk.Interpret
+                     , Treewalk.State
                      , Runtime.Value
                      , Runtime.Error
                      , Interpreter

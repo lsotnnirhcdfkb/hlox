@@ -1,14 +1,42 @@
-module Treewalk.Interpret (interpret) where
+module Treewalk.Interpret
+    ( interpretStmt
+    , interpretExpr
+    , interpretScript
+    ) where
 
 import Frontend.Ast
 import Frontend.Diagnostic
 import Runtime.Value
 import Runtime.Error
+import Treewalk.State
 
-interpret :: Located Expr -> Either RuntimeError (Located LoxValue)
-interpret (Located outSpan (BinaryExpr lhs@(Located lhsSpan _) (Located operatorSpan operator) rhs@(Located rhsSpan _))) =
-    interpret lhs >>= \locatedLhsValue@(Located _ lhsValue) ->
-    interpret rhs >>= \locatedRhsValue@(Located _ rhsValue) ->
+interpretScript :: [Located Stmt] -> IO (Either RuntimeError ())
+interpretScript stmts = interpretStmts InterpreterState {} stmts >> return (Right ())
+
+interpretStmts :: InterpreterState -> [Located Stmt] -> IO (Either RuntimeError InterpreterState)
+interpretStmts state (stmt:stmts) =
+    interpretStmt state stmt >>= \stmtRes ->
+    case stmtRes of
+        Left re -> return $ Left re
+        Right state' ->
+            interpretStmts state' stmts
+interpretStmts state [] = return $ Right state
+
+interpretStmt :: InterpreterState -> Located Stmt -> IO (Either RuntimeError InterpreterState)
+interpretStmt state (Located _ (PrintStmt expr)) =
+    case interpretExpr expr of
+        Left re -> return $ Left re
+        Right (Located _ value) ->
+            putStrLn (stringifyValue value) >>
+            return (Right state)
+
+interpretStmt state (Located _ (ExprStmt expr)) =
+    return $ interpretExpr expr >> Right state
+
+interpretExpr :: Located Expr -> Either RuntimeError (Located LoxValue)
+interpretExpr (Located outSpan (BinaryExpr lhs@(Located _ _) (Located operatorSpan operator) rhs@(Located _ _))) =
+    interpretExpr lhs >>= \locatedLhsValue@(Located _ lhsValue) ->
+    interpretExpr rhs >>= \locatedRhsValue@(Located _ rhsValue) ->
     let checkDoubles = checkOperandsDouble operatorSpan locatedLhsValue locatedRhsValue
     in case operator of
         Sub ->
@@ -46,8 +74,8 @@ interpret (Located outSpan (BinaryExpr lhs@(Located lhsSpan _) (Located operator
     where
         out value = Right $ Located outSpan value
 
-interpret (Located outSpan (UnaryExpr (Located operatorSpan operator) operandAST)) =
-    interpret operandAST >>= \loctedOperand@(Located _ operandValue) ->
+interpretExpr (Located outSpan (UnaryExpr (Located _ operator) operandAST)) =
+    interpretExpr operandAST >>= \(Located _ operandValue) ->
     case operator of
         Neg ->
             case operandValue of
@@ -56,13 +84,13 @@ interpret (Located outSpan (UnaryExpr (Located operatorSpan operator) operandAST
 
         Not -> Right $ Located outSpan $ LoxBool $ not (isTruthy operandValue)
 
-interpret (Located groupingSpan (GroupingExpr expr)) =
-    interpret expr >>= \(Located _ insideValue) ->
+interpretExpr (Located groupingSpan (GroupingExpr expr)) =
+    interpretExpr expr >>= \(Located _ insideValue) ->
     Right $ Located groupingSpan $ insideValue
 
-interpret (Located span (BoolExpr (Located _ b))) = Right $ Located span $ LoxBool b
-interpret (Located span (NumberExpr (Located _ n))) = Right $ Located span $ LoxNumber n
-interpret (Located span (StringExpr (Located _ s))) = Right $ Located span $ LoxString s
+interpretExpr (Located span (BoolExpr (Located _ b))) = Right $ Located span $ LoxBool b
+interpretExpr (Located span (NumberExpr (Located _ n))) = Right $ Located span $ LoxNumber n
+interpretExpr (Located span (StringExpr (Located _ s))) = Right $ Located span $ LoxString s
 
 isTruthy :: LoxValue -> Bool
 isTruthy LoxNil = False

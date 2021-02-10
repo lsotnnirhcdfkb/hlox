@@ -8,18 +8,18 @@ import System.IO
 
 import Frontend.Scan
 import Frontend.Parse
+import Frontend.Ast
 import Frontend.Diagnostic
 import qualified Treewalk.Interpret
-import Runtime.Value
+import Runtime.Error
 
 data InterpreterSettings = InterpreterSettings
                            { backend :: Backend
                            , file :: Maybe String
                            }
 
-data Backend = Treewalk | StackBC | RegisterBC
+data Backend = Treewalk
              deriving Show
-
 
 interpret :: InterpreterSettings -> IO ()
 interpret settings = case file settings of
@@ -44,14 +44,21 @@ run settings source =
         reportBeforeRunErrs = mapM_ report beforeRunErrs
         beforeRunSuccess = length beforeRunErrs == 0
 
-        treewalked = if beforeRunSuccess
-        then case parsed of
-                Just ast -> Just $ Treewalk.Interpret.interpret ast
-                _ -> error "parsed is Nothing but there are no before run errors"
+        -- TODO: reuse interpreter state for repl
+        backendFunction = chooseBackendFunction $ backend settings
+
+        interpreted = if beforeRunSuccess
+        then Just $ backendFunction parsed
         else Nothing
+
     in reportBeforeRunErrs >>
-    case treewalked of
-        Just (Right (Located _ res)) -> putStrLn $ stringifyValue res
-        Just (Left runErr) -> report $ toErr runErr
+    case interpreted of
+        Just res -> res >>= \ei ->
+            case ei of
+                Left runErr -> report $ toErr runErr
+                Right () -> return ()
         _ -> return ()
+
+chooseBackendFunction :: Backend -> ([Located Stmt] -> IO (Either RuntimeError ()))
+chooseBackendFunction Treewalk = Treewalk.Interpret.interpretScript
 

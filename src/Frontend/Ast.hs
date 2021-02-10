@@ -1,4 +1,4 @@
-module Frontend.Ast (Expr(..), BinaryOp(..), UnaryOp(..)) where
+module Frontend.Ast where
 
 import Frontend.Diagnostic
 
@@ -24,4 +24,8 @@ data Expr = BinaryExpr (Located Expr) (Located BinaryOp) (Located Expr)
           | NumberExpr (Located Double)
           | StringExpr (Located String)
           | UnaryExpr (Located UnaryOp) (Located Expr)
+          deriving Show
+
+data Stmt = PrintStmt (Located Expr)
+          | ExprStmt (Located Expr)
           deriving Show

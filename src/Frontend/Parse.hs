@@ -32,13 +32,13 @@ data Parser = Parser
     { tokens :: [Located Token]
     } deriving (Show)
 
-parse :: [Located Token] -> (Maybe (Located Expr), [ParseError])
+parse :: [Located Token] -> ([Located Stmt], [ParseError])
 parse tokens = (outputAST, errors)
     where
         parser = Parser tokens
-        (outputAST, errors, _) = parseExpr parser 0 ""
+        (outputAST, errors, _) = parseStmts parser
 
-type ParserOutput a = (Maybe a, [ParseError], Parser)
+type ParserOutput a = (a, [ParseError], Parser)
 
 advance :: Parser -> Int -> Parser
 advance (Parser tokens) n = Parser $ drop n tokens
@@ -47,7 +47,60 @@ peek :: Parser -> Located Token
 peek (Parser { tokens = (firstToken:_) }) = firstToken
 peek (Parser { tokens = [] }) = error "peek empty parser"
 
-parseExpr :: Parser -> Int -> String -> ParserOutput (Located Expr)
+getFirstToken :: Parser -> Token
+getFirstToken (Parser []) = error "get first token of empty parser, which should never happen"
+getFirstToken (Parser ((Located _ tok):_)) = tok
+
+parseStmts :: Parser -> ParserOutput [Located Stmt]
+parseStmts parser =
+    case getFirstToken parser of
+        Eof -> ([], [], parser)
+        _ ->
+            let (maybeStmt, singleErrs, parser') = parseStmt parser
+                (nextStmts, nextErrs, parser'') = parseStmts parser'
+
+                totalStmts = case maybeStmt of
+                    Just s -> s:nextStmts
+                    Nothing -> nextStmts
+
+                totalErrs = singleErrs ++ nextErrs
+
+            in (totalStmts, totalErrs, parser'')
+
+parseStmt :: Parser -> ParserOutput (Maybe (Located Stmt))
+parseStmt parser =
+    let first = getFirstToken parser
+    in case first of
+        Print -> parsePrintStmt parser
+        _ -> parseExprStmt parser
+
+-- TODO FIX: consume semicolon
+parsePrintStmt :: Parser -> ParserOutput (Maybe (Located Stmt))
+parsePrintStmt parser =
+    let (Located printSpan _) = peek parser
+        (maybeExpr, errs, parser') = parseExpr (parser `advance` 1) 0 "expression to print"
+
+        (printStmt, semiErrs, parser'') = case maybeExpr of
+            Just exprToPrint@(Located exprSpan _) ->
+                case peek parser' of
+                    Located semiSpan Semicolon ->
+                        (Just $ Located (printSpan `joinSpan` semiSpan) $ PrintStmt exprToPrint, [], parser' `advance` 1)
+                    _ -> (Nothing, [Expected (After exprSpan) "';'" Nothing], parser')
+            Nothing -> (Nothing, [], parser')
+
+    in (printStmt, errs ++ semiErrs, parser'')
+
+parseExprStmt :: Parser -> ParserOutput (Maybe (Located Stmt))
+parseExprStmt parser =
+    let (maybeExpr, errs, parser') = parseExpr parser 0 "expression statement"
+    in case maybeExpr of
+        Just locatedExpr@(Located exprSpan _) ->
+            case peek parser' of
+                Located semiSpan Semicolon -> (Just $ Located (exprSpan `joinSpan` semiSpan) $ ExprStmt locatedExpr, errs, parser' `advance` 1)
+                _ -> (Nothing, errs ++ [Expected (After exprSpan) "';'" Nothing], parser')
+        Nothing -> (Nothing, errs, parser')
+
+parseExpr :: Parser -> Int -> String -> ParserOutput (Maybe (Located Expr))
 parseExpr (Parser []) _ _ = error "parser should never be empty! there should be an eof token that terminates it"
 parseExpr parser prec representing =
     let (prefixParsedExpr, prefixErrors, parser') = prefixParse parser representing
@@ -56,7 +109,7 @@ parseExpr parser prec representing =
             Nothing -> (Nothing, [], parser')
     in (infixParsedExpr, prefixErrors ++ infixErrors, parser'')
 
-prefixParse :: Parser -> String -> ParserOutput (Located Expr)
+prefixParse :: Parser -> String -> ParserOutput (Maybe (Located Expr))
 prefixParse parser representing =
     let locatedFirstToken@(Located firstTokenSpan firstToken):_ = tokens parser
         chosenPrefixParseFunc = case firstToken of
@@ -72,19 +125,16 @@ prefixParse parser representing =
         Just func -> (parser `advance` 1) `func` locatedFirstToken
         Nothing   -> (Nothing, [Expected (At firstTokenSpan) "expression" $ Just representing], parser)
 
-getFirstToken :: Parser -> Token
-getFirstToken (Parser ((Located _ tok):_)) = tok
-
-precedenceAssignment = 1
-precedenceOr = 2
-precedenceAnd = 3
-precedenceEquality = 4
-precedenceComparison = 5
-precedenceTerm = 6
-precedenceFactor = 9
-precedenceUnary = 10
-precedenceCall = 11
-precedencePrimary = 12
+precedenceAssignment = 1 :: Int
+precedenceOr = 2 :: Int
+precedenceAnd = 3 :: Int
+precedenceEquality = 4 :: Int
+precedenceComparison = 5 :: Int
+precedenceTerm = 6 :: Int
+precedenceFactor = 9 :: Int
+precedenceUnary = 10 :: Int
+precedenceCall = 11 :: Int
+precedencePrimary = 12 :: Int
 
 precedenceOf :: Token -> Int
 precedenceOf BangEqual                  = precedenceEquality
@@ -99,10 +149,10 @@ precedenceOf Star                       = precedenceFactor
 precedenceOf Slash                      = precedenceFactor
 precedenceOf _                          = 0
 
-infixParse :: Parser -> Located Expr -> Int -> ParserOutput (Located Expr)
+infixParse :: Parser -> Located Expr -> Int -> ParserOutput (Maybe (Located Expr))
 infixParse parser lhs prec
     | (precedenceOf $ getFirstToken parser) >= prec =
-        let locatedOperatorToken@(Located operatorSpan operatorToken):_ = tokens parser
+        let locatedOperatorToken@(Located _ operatorToken):_ = tokens parser
             chosenParseFunc = case operatorToken of
                 BangEqual                  -> Just parseBinaryExpr
                 EqualEqual                 -> Just parseBinaryExpr
@@ -124,8 +174,8 @@ infixParse parser lhs prec
                 Nothing   -> (Just lhs, [], parser)
     | otherwise = (Just lhs, [], parser)
 
-parseBinaryExpr :: Parser -> Located Expr -> Located Token -> ParserOutput (Located Expr)
-parseBinaryExpr parser locatedLhs@(Located lhsSpan lhs) locatedOperator@(Located operatorSpan operatorToken) =
+parseBinaryExpr :: Parser -> Located Expr -> Located Token -> ParserOutput (Maybe (Located Expr))
+parseBinaryExpr parser locatedLhs@(Located lhsSpan _) locatedOperator@(Located operatorSpan operatorToken) =
     let (binaryOperator', rhsOf) = case operatorToken of
             Plus                       -> (Add, "addition")
             Minus                      -> (Sub, "subtraction")
@@ -140,10 +190,10 @@ parseBinaryExpr parser locatedLhs@(Located lhsSpan lhs) locatedOperator@(Located
             _     -> error "invalid binary operator"
         binaryOperator = Located operatorSpan binaryOperator'
         (maybeRhs, rhsErrors, rhsParser) = parseExpr parser (precedenceOf operatorToken + 1) $ "right hand side to " ++ rhsOf ++ " expression"
-        maybeBinary = (\locatedRhs@(Located rhsSpan rhs) -> Located (lhsSpan `joinSpan` rhsSpan) $ BinaryExpr locatedLhs binaryOperator locatedRhs) <$> maybeRhs
+        maybeBinary = (\locatedRhs@(Located rhsSpan _) -> Located (lhsSpan `joinSpan` rhsSpan) $ BinaryExpr locatedLhs binaryOperator locatedRhs) <$> maybeRhs
     in (maybeBinary, rhsErrors, rhsParser)
 
-parseTokenExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
+parseTokenExpr :: Parser -> Located Token -> ParserOutput (Maybe (Located Expr))
 parseTokenExpr parser (Located tokenSpan token) =
     let expr = case token of
             BoolLiteral bool  -> BoolExpr $ Located tokenSpan bool
@@ -152,7 +202,7 @@ parseTokenExpr parser (Located tokenSpan token) =
             _ -> error "parse a bool expr where the first token is not a BoolLiteral"
     in (Just $ Located tokenSpan expr, [], parser)
 
-parseGroupingExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
+parseGroupingExpr :: Parser -> Located Token -> ParserOutput (Maybe (Located Expr))
 parseGroupingExpr parser (Located openParenSpan _) =
     let (maybeExpr, errs, parser') = parseExpr parser 0 "grouped expression inside parentheses"
         (groupedExpr, parenErrs, parser'') = case maybeExpr of
@@ -168,7 +218,7 @@ parseGroupingExpr parser (Located openParenSpan _) =
 
     in (groupedExpr, errs ++ parenErrs, parser'')
 
-parseUnaryExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
+parseUnaryExpr :: Parser -> Located Token -> ParserOutput (Maybe (Located Expr))
 parseUnaryExpr parser (Located operatorSpan operatorToken) =
     let (operator', unaryExprType) = case operatorToken of
             Bang -> (Not, "logical not")
@@ -179,7 +229,7 @@ parseUnaryExpr parser (Located operatorSpan operatorToken) =
         unaryExpr = (\locatedOperand@(Located operandSpan _) -> Located (operatorSpan `joinSpan` operandSpan) $ UnaryExpr operator locatedOperand) <$> maybeOperand
     in (unaryExpr, operandErrors, nextParser)
 
-parseUnaryPositiveExpr :: Parser -> Located Token -> ParserOutput (Located Expr)
-parseUnaryPositiveExpr parser (Located operatorSpan operatorToken) =
+parseUnaryPositiveExpr :: Parser -> Located Token -> ParserOutput (Maybe (Located Expr))
+parseUnaryPositiveExpr parser (Located operatorSpan _) =
     let (_, operandErrors, nextParser) = parseExpr parser precedenceUnary $ "operand to unary + expression"
     in (Nothing, (UnaryPlusUnsupported operatorSpan):operandErrors, nextParser)
