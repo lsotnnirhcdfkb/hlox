@@ -11,7 +11,9 @@ import Runtime.Error
 import Treewalk.State
 
 interpretScript :: [Located Stmt] -> IO (Either RuntimeError ())
-interpretScript stmts = interpretStmts InterpreterState {} stmts >> return (Right ())
+interpretScript stmts =
+    interpretStmts InterpreterState {} stmts >>= \ei ->
+    return $ ei >> Right ()
 
 interpretStmts :: InterpreterState -> [Located Stmt] -> IO (Either RuntimeError InterpreterState)
 interpretStmts state (stmt:stmts) =
