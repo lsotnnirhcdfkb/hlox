@@ -74,7 +74,6 @@ parseStmt parser =
         Print -> parsePrintStmt parser
         _ -> parseExprStmt parser
 
--- TODO FIX: consume semicolon
 parsePrintStmt :: Parser -> ParserOutput (Maybe (Located Stmt))
 parsePrintStmt parser =
     let (Located printSpan _) = peek parser
@@ -176,7 +175,7 @@ infixParse parser lhs prec
     | otherwise = (Just lhs, [], parser)
 
 parseBinaryExpr :: Parser -> Located Expr -> Located Token -> ParserOutput (Maybe (Located Expr))
-parseBinaryExpr parser locatedLhs@(Located lhsSpan _) locatedOperator@(Located operatorSpan operatorToken) =
+parseBinaryExpr parser locatedLhs@(Located lhsSpan _) (Located operatorSpan operatorToken) =
     let (binaryOperator', rhsOf) = case operatorToken of
             Plus                       -> (Add, "addition")
             Minus                      -> (Sub, "subtraction")
