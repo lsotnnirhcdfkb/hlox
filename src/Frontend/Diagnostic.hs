@@ -75,4 +75,4 @@ report (Error messages) =
 
         formatMessage (Message Nothing message) = "<somewhere>: " ++ message ++ "\n"
 
-        finalMessage = "error:\n" ++ (foldl' (++) "" $ map formatMessage messages)
+        finalMessage = "    error:\n" ++ (foldl' (++) "" $ map formatMessage messages)
