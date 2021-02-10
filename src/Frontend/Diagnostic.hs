@@ -9,6 +9,7 @@ module Frontend.Diagnostic
     , LoxError(toErr)
     ) where
 
+import System.IO
 import Data.List(foldl')
 
 class LoxError e where
@@ -46,7 +47,7 @@ nthLineOf src n
 
 report :: Error -> IO ()
 report (Error messages) =
-    putStr finalMessage
+    hPutStr stderr finalMessage
     where
         formatMessage :: Message -> String
         formatMessage (Message (Just msgLocation) message) =
