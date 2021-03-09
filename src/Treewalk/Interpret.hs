@@ -17,11 +17,9 @@ interpretScript stmts =
     interpretStmts baseState stmts >>= \ei ->
     return $ ei >> Right ()
     where
-        baseState = InterpreterState
-                    { vars = Map.empty
-                    }
+        baseState = InterpreterState {}
 
-interpretStmts :: InterpreterState -> [Located Stmt] -> IO (Either RuntimeError InterpreterState)
+interpretStmts :: InterpreterState -> [Located Stmt] -> IO (Either (RuntimeError, InterpreterState) InterpreterState)
 interpretStmts state (stmt:stmts) =
     interpretStmt state stmt >>= \stmtRes ->
     case stmtRes of

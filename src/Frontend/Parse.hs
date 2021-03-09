@@ -5,7 +5,6 @@ import Frontend.Ast
 import Frontend.Diagnostic
 
 import Control.Monad.State
-import Debug.Trace (trace)
 
 -- note: this parser code is kind of janky
 
