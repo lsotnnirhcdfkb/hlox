@@ -4,61 +4,47 @@ module Interpreter
     , Backend(..)
     ) where
 
-import System.IO
-
 import Frontend.Scan
 import Frontend.Parse
 import Frontend.Ast
 import Frontend.Diagnostic
-import qualified Treewalk.Interpret
 import Runtime.Error
+
+import qualified StackBC.Interpret
 
 data InterpreterSettings = InterpreterSettings
                            { backend :: Backend
-                           , file :: Maybe String
+                           , file :: String
                            }
 
-data Backend = Treewalk
+data Backend = StackBC
              deriving Show
 
 interpret :: InterpreterSettings -> IO ()
-interpret settings = case file settings of
-    Just file -> runFile settings file
-    Nothing -> repl settings
+interpret settings = readFile (file settings) >>= run settings
 
-repl :: InterpreterSettings -> IO ()
-repl settings = putStr "> " >> hFlush stdout >> getLine >>= run settings >> repl settings
+runStage :: LoxError b => (a, [b]) -> (a, [Error])
+runStage (result, stageErrors) = (result, map toErr stageErrors)
 
-runFile :: InterpreterSettings -> String -> IO ()
-runFile settings fileName = readFile fileName >>= run settings
+joinStages :: (LoxError b, LoxError d) => (a, [b]) -> (a -> (c, [d])) -> (c, [Error])
+firstRes `joinStages` nextStage =
+    let (firstStageRes, firstStageErrs) = runStage firstRes
+        (secondStageRes, secondStageErrs) = runStage $ nextStage firstStageRes
+    in (secondStageRes, firstStageErrs ++ secondStageErrs)
 
 run :: InterpreterSettings -> String -> IO ()
 run settings source =
-    let (scanned, scanErrors') = scan source
-        scanErrors = map toErr scanErrors'
-
-        (parsed, parseErrors') = parse scanned
-        parseErrors = map toErr parseErrors'
-
-        beforeRunErrs = scanErrors ++ parseErrors
-        reportBeforeRunErrs = mapM_ report beforeRunErrs
-        beforeRunSuccess = length beforeRunErrs == 0
-
-        -- TODO: reuse interpreter state for repl
+    let (beforeRunRes, beforeRunErrs) =
+            (scan source) `joinStages` parse
         backendFunction = chooseBackendFunction $ backend settings
-
-        interpreted = if beforeRunSuccess
-        then Just $ backendFunction parsed
-        else Nothing
-
-    in reportBeforeRunErrs >>
-    case interpreted of
-        Just res -> res >>= \ei ->
-            case ei of
+    in case beforeRunErrs of
+        [] ->
+            backendFunction beforeRunRes >>= \runRes ->
+            case runRes of
                 Left runErr -> report $ toErr runErr
                 Right () -> return ()
-        _ -> return ()
+        errs@(_:_) -> mapM_ report errs
 
 chooseBackendFunction :: Backend -> ([Located Stmt] -> IO (Either RuntimeError ()))
-chooseBackendFunction Treewalk = Treewalk.Interpret.interpretScript
+chooseBackendFunction StackBC = StackBC.Interpret.interpret
 

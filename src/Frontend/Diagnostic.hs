@@ -16,7 +16,7 @@ class LoxError e where
     toErr :: e -> Error
 
 data Located a = Located Span a
-                 deriving (Show)
+               deriving (Show)
 
 data Error = Error [Message]
 data Message = Message (Maybe DescriptiveLocation) String
